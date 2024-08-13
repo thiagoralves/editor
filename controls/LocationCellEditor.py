@@ -173,7 +173,8 @@ class LocationCellEditor(wx.grid.GridCellEditor):
 
     def EndEdit(self, row, col, grid, old_loc):
         loc = self.CellControl.GetValue()
-        changed = loc != old_loc
+        #changed = loc != old_loc
+        changed = True #force changed to be always true
         if changed:
             name = self.CellControl.GetName()
             if name is not None:

@@ -49,7 +49,7 @@ HIGHLIGHT_TYPES = {
     SEARCH_RESULT_HIGHLIGHT: STC_CODE_SEARCH_RESULT,
 }
 
-EDGE_COLUMN = 80
+EDGE_COLUMN = 240
 
 
 def GetSectionsText(controler, sections_headers):
@@ -152,7 +152,7 @@ class CodeEditor(CustomStyledTextCtrl):
         self.SectionsComments = {}
         for section in self.Controler.SECTIONS_NAMES:
             section_comment = " %s section " % (section)
-            len_headers = EDGE_COLUMN - len(section_comment)
+            len_headers = (EDGE_COLUMN // 3) - len(section_comment)
             section_comment = \
                 self.COMMENT_HEADER * (len_headers // 2) + \
                 section_comment + \
@@ -285,7 +285,7 @@ class CodeEditor(CustomStyledTextCtrl):
             self.SetLineState(line, 0)
 
         doc_end_pos = self.GetLength()
-        for section in self.Controler.SECTIONS_NAMES:
+        """for section in self.Controler.SECTIONS_NAMES:
             section_comments = self.SectionsComments[section]
             txttofind = section_comments["comment"]
             results = self.FindText(0, doc_end_pos, txttofind)
@@ -299,7 +299,7 @@ class CodeEditor(CustomStyledTextCtrl):
             self.SetLineState(self.LineFromPosition(start_pos), 1)
 
         self.StartStyling(end_pos)
-        self.SetStyling(doc_end_pos - end_pos, stc.STC_STYLE_DEFAULT)
+        self.SetStyling(doc_end_pos - end_pos, stc.STC_STYLE_DEFAULT)"""
 
     def DoGetBestSize(self):
         return self.ParentWindow.GetBestSize()
@@ -795,7 +795,8 @@ class VariablesEditor(wx.Panel):
     def OnVariablesGridCellChange(self, event):
         row, col = event.GetRow(), event.GetCol()
         colname = self.Table.GetColLabelValue(col, False)
-        value = self.Table.GetValue(row, col)
+        #value = self.Table.GetValue(row, col)
+        value = event.String
         message = None
 
         if colname == "Name" and value != "":
@@ -808,9 +809,11 @@ class VariablesEditor(wx.Panel):
                                    if var_row != row]:
                 message = _("A variable with \"%s\" as name already exists!") % value
             else:
+                self.Table.SetValue(row, col, value)
                 self.RefreshModel()
                 wx.CallAfter(self.RefreshView)
         else:
+            self.Table.SetValue(row, col, value)
             self.RefreshModel()
             wx.CallAfter(self.RefreshView)
 

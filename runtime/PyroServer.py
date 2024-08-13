@@ -14,44 +14,11 @@
 import sys
 import os
 
-import Pyro5
-import Pyro5.server
-
+import Pyro
+import Pyro.core as pyro
 import runtime
 from runtime.ServicePublisher import ServicePublisher
 
-Pyro5.config.SERIALIZER = "msgpack"
-
-def make_pyro_exposed_stub(method_name):
-    stub = lambda self, *args, **kwargs: \
-        getattr(self.plc_object_instance, method_name)(*args, **kwargs)
-    stub.__name__ = method_name
-    Pyro5.server.expose(stub)
-    return stub
-    
-
-class PLCObjectPyroAdapter(type("PLCObjectPyroStubs", (), {
-    name: make_pyro_exposed_stub(name) for name in [
-        "AppendChunkToBlob",
-        "GetLogMessage",
-        "GetPLCID",
-        "GetPLCstatus",
-        "GetTraceVariables",
-        "MatchMD5", 
-        "NewPLC",
-        "PurgeBlobs",
-        "RemoteExec",
-        "RepairPLC",
-        "ResetLogCount",
-        "SeedBlob",
-        "SetTraceVariablesList",
-        "StartPLC",
-        "StopPLC"
-    ]
-})):
-    def __init__(self, plc_object_instance):
-        self.plc_object_instance = plc_object_instance
-    
 
 class PyroServer(object):
     def __init__(self, servicename, ip_addr, port):
@@ -73,22 +40,40 @@ class PyroServer(object):
         if self._to_be_published():
             print(_("Publishing service on local network"))
 
-        if sys.stdout:
-            sys.stdout.flush()
+        sys.stdout.flush()
 
     def PyroLoop(self, when_ready):
         if self._to_be_published():
             self.Publish()
 
         while self.continueloop:
-            self.daemon = Pyro5.server.Daemon(host=self.ip_addr, port=self.port)
+            Pyro.config.PYRO_MULTITHREADED = 0
+            pyro.initServer()
+            self.daemon = pyro.Daemon(host=self.ip_addr, port=self.port)
 
-            self.daemon.register(PLCObjectPyroAdapter(runtime.GetPLCObjectSingleton()), "PLCObject")
+            # pyro never frees memory after connection close if no timeout set
+            # taking too small timeout value may cause
+            # unwanted diconnection when IDE is kept busy for long periods
+            self.daemon.setTimeout(60)
+
+            pyro_obj = Pyro.core.ObjBase()
+            pyro_obj.delegateTo(runtime.GetPLCObjectSingleton())
+
+            self.daemon.connect(pyro_obj, "PLCObject")
 
             when_ready()
 
-            self.daemon.requestLoop()
+            # "pipe to self" trick to to accelerate runtime shutdown 
+            # instead of waiting for arbitrary pyro timeout.
+            others = []
+            if not sys.platform.startswith('win'):
+                self.piper, self.pipew = os.pipe()
+                others.append(self.piper)
 
+            self.daemon.requestLoop(others=others, callback=lambda x: None)
+            self.piper, self.pipew = None, None
+            if hasattr(self, 'sock'):
+                self.daemon.sock.close()
         self.Unpublish()
 
     def Restart(self):
@@ -96,7 +81,8 @@ class PyroServer(object):
 
     def Quit(self):
         self.continueloop = False
-        self.daemon.shutdown()
+        self.daemon.shutdown(True)
+        self.daemon.closedown()
         if not sys.platform.startswith('win'):
             if self.pipew is not None:
                 os.write(self.pipew, "goodbye")

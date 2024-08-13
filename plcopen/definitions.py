@@ -48,7 +48,15 @@ LOCATIONDATATYPES = {"X": ["BOOL"],
 # -------------------------------------------------------------------------------
 
 StdTC6Libs = [(_("Standard function blocks"),   join(sd, "Standard_Function_Blocks.xml")),
-              (_("Additional function blocks"), join(sd, "Additional_Function_Blocks.xml"))]
+              (_("Additional function blocks"), join(sd, "Additional_Function_Blocks.xml")),
+              (_("Arduino"), join(sd, "Arduino_Function_Blocks.xml")),
+              (_("Microver"), join(sd, "CAN_Function_Blocks.xml")),
+              (_("Communication"), join(sd, "Communication_Blocks.xml")),
+              (_("P1AM Modules"), join(sd, "P1AM.xml")),
+              (_("MQTT"), join(sd, "MQTT.xml")),
+              (_("Sequent Microsystems Modules"), join(sd, "SM_Cards.xml")),
+              (_("Jaguar"), join(sd, "Jaguar.xml")),
+              (_("SL-RP4"), join(sd, "SL-RP4.xml"))]
 
 StdFuncsCSV = join(sd, "iec_std.csv")
 

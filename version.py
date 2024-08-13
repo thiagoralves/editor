@@ -23,46 +23,77 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 
-
-
-
-
 import os
+import subprocess
+
+import util.paths as paths
+
 
 def GetCommunityHelpMsg():
     return _(
-        "The best place to ask questions about Beremiz/PLCOpenEditor\n"
-        "is project's mailing list: beremiz-devel@lists.sourceforge.net\n"
+        "The best place to ask questions about OpenPLC Runtime\n"
+        "and OpenPLC Editor is in the project's official forum:\n"
         "\n"
-        "This is the main community support channel.\n"
-        "For posting it is required to be subscribed to the mailing list.\n"
-        "\n"
-        "You can subscribe to the list here:\n"
-        "https://lists.sourceforge.net/lists/listinfo/beremiz-devel"
+        "https://openplc.discussion.community/\n"
     )
 
 
+def GetAppRevision():
+    rev = None
+    app_dir = paths.AbsDir(__file__)
+    try:
+        pipe = subprocess.Popen(
+            ["git", "pull"],
+            stdout=subprocess.PIPE,
+            cwd=app_dir, shell=True
+        )
+        pipe = subprocess.Popen(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            stdout=subprocess.PIPE,
+            cwd=app_dir, shell=True
+        )
+        rev = pipe.communicate()
+        rev = rev[0]
+        rev = rev.decode()
+        if pipe.returncode != 0:
+            rev = None
+    except Exception:
+        pass
+
+    # if this is not mercurial repository
+    # try to read revision from file
+    if rev is None:
+        try:
+            f = open(os.path.join(app_dir, "revision"))
+            rev = f.readline()
+        except Exception:
+            pass
+    return rev
+
+
 def GetAboutDialogInfo(info):
+    import wx
+    info = wx.adv.AboutDialogInfo()
 
+    info.Name = "OpenPLC Editor"
     info.Version = app_version
-
     info.Copyright = ""
-    info.Copyright += "(C) 2006-2023 Edouard Tisserant\n"
-    info.Copyright += "(C) 2003-2023 Mario de Sousa\n"
-    info.Copyright += "(C) 2022-2023 GP Orcullo\n"
-    info.Copyright += "(C) 2016-2018 Andrey Skvortsov\n"
-    info.Copyright += "(C) 2006-2013 Laurent Bessard\n"
-
-    info.WebSite = ("http://beremiz.org", "beremiz.org")
-
+    info.Copyright += "(C) 2019 Thiago Alves"
+    #info.Copyright += "(C) 2016-2018 Andrey Skvortsov\n"
+    #info.Copyright += "(C) 2008-2018 Eduard Tisserant\n"
+    #info.Copyright += "(C) 2008-2015 Laurent Bessard"
+    info.WebSite = ("http://www.openplcproject.com", "openplcproject.com")
+    info.Description = _("Open Source IDE for the OpenPLC Runtime, compliant with "
+                         "the IEC 61131-3 international standard.\n\nBased on PLCOpen Editor and Beremiz by Andrey Skvortsov, Sergey Surkov, Edouard Tisserant and Laurent Bessard.")
+    #info.Developers = "Thiago Alves <thiagoralves@gmail.com>"
     info.Developers = (
+        "Thiago Alves <thiago.alves@autonomylogic.com>",
         "Edouard Tisserant <contact@beremiz.fr>",
         "Mario de Sousa <msousa@fe.up.pt>",
         "GP Orcullo <kinsamanka@gmail.com>",
         "Andrey Skvortsov <andrej.skvortzov@gmail.com>",
         "Sergey Surkov <surkov.sv@summatechnology.ru>",
         "Laurent Bessard <laurent.bessard@gmail.com>")
-
     info.License = (
         '\n This program is free software; you can redistribute it and/or\n'
         ' modify it under the terms of the GNU General Public License\n'
@@ -80,11 +111,14 @@ def GetAboutDialogInfo(info):
     )
 
     # read license file
-    license_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "COPYING")
+    path = paths.AbsDir(__file__)
+    license_path = os.path.join(path, "COPYING")
     if os.path.exists(license_path):
         with open(license_path) as f:
             info.License += f.read()
+
+    info.IconPath = os.path.join(path, "images", "about_brz_logo.png")
+    info.Icon = wx.Icon(os.path.join(path, "images", "about_brz_logo.png"), wx.BITMAP_TYPE_PNG)
 
     info.Translators = (
         "Basque",
@@ -185,7 +219,8 @@ def GetAboutDialogInfo(info):
     return info
 
 
-app_version = "1.4-beta2"
-
-if __name__ == "__main__":
-    print(app_version)
+app_version = "3.0"
+#rev = GetAppRevision()
+rev = "Release: 2024-08-12"
+if rev is not None:
+    app_version = app_version + "\n" + rev.rstrip()

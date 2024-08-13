@@ -191,7 +191,7 @@ class LD_PowerRail(Graphic_Element):
             else:
                 position = self.Extensions[0] + int(round(i * interval))
             if scaling is not None:
-                position = round((self.Pos.y + position) / scaling[1]) * scaling[1] - self.Pos.y
+                position = int(round((self.Pos.y + position) / scaling[1]) * scaling[1] - self.Pos.y)
             if self.Type == LEFTRAIL:
                 connector.SetPosition(wx.Point(self.Size[0], position))
             elif self.Type == RIGHTRAIL:
@@ -312,7 +312,7 @@ class LD_PowerRail(Graphic_Element):
             movey = max(-self.BoundingBox.y, movey)
             if scaling is not None:
                 position = handle.GetRelPosition()
-                movey = round((self.Pos.y + position.y + movey) / scaling[1]) * scaling[1] - self.Pos.y - position.y
+                movey = int(round((self.Pos.y + position.y + movey) / scaling[1]) * scaling[1] - self.Pos.y - position.y)
             self.MoveConnector(handle, movey)
             return 0, movey
         elif self.Parent.GetDrawingMode() == FREEDRAWING_MODE:
@@ -545,7 +545,7 @@ class LD_Contact(Graphic_Element, DebugDataConsumer):
         scaling = self.Parent.GetScaling()
         position = self.Size[1] // 2 + 1
         if scaling is not None:
-            position = round((self.Pos.y + position) / scaling[1]) * scaling[1] - self.Pos.y
+            position = int(round((self.Pos.y + position) / scaling[1]) * scaling[1] - self.Pos.y)
         self.Input.SetPosition(wx.Point(0, position))
         self.Output.SetPosition(wx.Point(self.Size[0], position))
         self.RefreshConnected()
@@ -591,17 +591,17 @@ class LD_Contact(Graphic_Element, DebugDataConsumer):
         dc.SetUserScale(1, 1)
         dc.SetPen(MiterPen(HIGHLIGHTCOLOR))
         dc.SetBrush(wx.Brush(HIGHLIGHTCOLOR))
-        dc.SetLogicalFunction(wx.AND)
+        #dc.SetLogicalFunction(wx.AND)
         # Draw two rectangles for representing the contact
-        left_left = (self.Pos.x - 1) * scalex - 2
-        right_left = (self.Pos.x + self.Size[0] - 2) * scalex - 2
-        top = (self.Pos.y - 1) * scaley - 2
-        width = 4 * scalex + 5
-        height = (self.Size[1] + 3) * scaley + 5
+        left_left = int(round((self.Pos.x - 1) * scalex - 2))
+        right_left = int(round((self.Pos.x + self.Size[0] - 2) * scalex - 2))
+        top = int(round((self.Pos.y - 1) * scaley - 2))
+        width = int(round(4 * scalex + 5))
+        height = int(round((self.Size[1] + 3) * scaley + 5))
 
         dc.DrawRectangle(left_left, top, width, height)
         dc.DrawRectangle(right_left, top, width, height)
-        dc.SetLogicalFunction(wx.COPY)
+        #dc.SetLogicalFunction(wx.COPY)
         dc.SetUserScale(scalex, scaley)
 
     # Adds an highlight to the connection
@@ -865,7 +865,7 @@ class LD_Coil(Graphic_Element):
         scaling = self.Parent.GetScaling()
         position = self.Size[1] // 2 + 1
         if scaling is not None:
-            position = round((self.Pos.y + position) / scaling[1]) * scaling[1] - self.Pos.y
+            position = int(round((self.Pos.y + position) / scaling[1]) * scaling[1] - self.Pos.y)
         self.Input.SetPosition(wx.Point(0, position))
         self.Output.SetPosition(wx.Point(self.Size[0], position))
         self.RefreshConnected()
@@ -911,19 +911,19 @@ class LD_Coil(Graphic_Element):
         dc.SetUserScale(1, 1)
         dc.SetPen(MiterPen(HIGHLIGHTCOLOR, (3 * scalex + 5), wx.SOLID))
         dc.SetBrush(wx.TRANSPARENT_BRUSH)
-        dc.SetLogicalFunction(wx.AND)
+        #dc.SetLogicalFunction(wx.AND)
         # Draw a two circle arcs for representing the coil
-        dc.DrawEllipticArc(round(self.Pos.x * scalex),
-                           round((self.Pos.y - int(self.Size[1] * (sqrt(2) - 1.) / 2.) + 1) * scaley),
-                           round(self.Size[0] * scalex),
-                           round((int(self.Size[1] * sqrt(2)) - 1) * scaley),
+        dc.DrawEllipticArc(int(round(self.Pos.x * scalex)),
+                           int(round((self.Pos.y - int(self.Size[1] * (sqrt(2) - 1.) / 2.) + 1) * scaley)),
+                           int(round(self.Size[0] * scalex)),
+                           int(round((int(self.Size[1] * sqrt(2)) - 1) * scaley)),
                            135, 225)
-        dc.DrawEllipticArc(round(self.Pos.x * scalex),
-                           round((self.Pos.y - int(self.Size[1] * (sqrt(2) - 1.) / 2.) + 1) * scaley),
-                           round(self.Size[0] * scalex),
-                           round((int(self.Size[1] * sqrt(2)) - 1) * scaley),
+        dc.DrawEllipticArc(int(round(self.Pos.x * scalex)),
+                           int(round((self.Pos.y - int(self.Size[1] * (sqrt(2) - 1.) / 2.) + 1) * scaley)),
+                           int(round(self.Size[0] * scalex)),
+                           int(round((int(self.Size[1] * sqrt(2)) - 1) * scaley)),
                            -45, 45)
-        dc.SetLogicalFunction(wx.COPY)
+        #dc.SetLogicalFunction(wx.COPY)
         dc.SetUserScale(scalex, scaley)
 
     # Adds an highlight to the connection
@@ -977,6 +977,8 @@ class LD_Coil(Graphic_Element):
         if getattr(dc, "printing", False) and not isinstance(dc, wx.PostScriptDC):
             # Draw an clipped ellipse for representing the coil
             clipping_box = dc.GetClippingBox()
+            if len(clipping_box) == 5:
+                clipping_box = (clipping_box[1],clipping_box[2],clipping_box[3],clipping_box[4])
             dc.SetClippingRegion(self.Pos.x - 1, self.Pos.y, self.Size[0] + 2, self.Size[1] + 1)
             dc.DrawEllipse(self.Pos.x, self.Pos.y - int(self.Size[1] * (sqrt(2) - 1.) / 2.) + 1, self.Size[0], int(self.Size[1] * sqrt(2)) - 1)
             dc.DestroyClippingRegion()

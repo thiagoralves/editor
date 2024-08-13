@@ -10,7 +10,7 @@ import shutil
 from util.ProcessLogger import ProcessLogger
 from util.paths import Bpath
 
-_exec = sys.executable if "darwin" not in sys.platform else sys.executable + 'w'
+_exec = sys.executable if "windows" not in sys.platform else sys.executable + 'w'
 LocalRuntimeInterpreterPath = os.environ.get("BEREMIZPYTHONPATH", _exec)
 
 LocalHost = os.environ.get("BEREMIZ_LOCAL_HOST", "127.0.0.1")
@@ -31,18 +31,22 @@ class LocalRuntimeMixin():
             # choose an arbitrary random port for runtime
             self.runtime_port = int(random.random() * 1000) + 61131
             self.local_runtime_log.write(_("Starting local runtime...\n"))
+            if (os.name == 'nt'):
+                exec_cwd = None
+            else:
+                exec_cwd = self.local_runtime_tmpdir
             # launch local runtime
             self.local_runtime = ProcessLogger(
                 self.local_runtime_log,
-                ("\"%s\" \"%s\" -p %s -i "+LocalHost+" %s %s") % (
+                "\"%s\" \"%s\" -p %s -i localhost %s %s" % (
                     LocalRuntimeInterpreterPath,
-                    Bpath("Beremiz_service.py"),
+                    Bpath("service.py"),
                     self.runtime_port,
                     {False: "-x 0", True: "-x 1"}[self.use_gui],
                     self.local_runtime_tmpdir),
                 no_gui=False,
                 timeout=500, keyword=self.local_runtime_tmpdir,
-                cwd=self.local_runtime_tmpdir)
+                cwd=exec_cwd)
             self.local_runtime.spin()
         return self.runtime_port
 
@@ -50,8 +54,10 @@ class LocalRuntimeMixin():
         if self.local_runtime is not None:
             # shutdown local runtime
             self.local_runtime.kill(gently=False)
-            # clear temp dir
-            shutil.rmtree(self.local_runtime_tmpdir)
+            # clear temp dir (surround it with try/except as it could fail in some systems with permission denied)
+            try:
+                shutil.rmtree(self.local_runtime_tmpdir)
+            except:
+                pass
 
             self.local_runtime = None
-

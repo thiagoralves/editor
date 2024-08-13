@@ -32,6 +32,7 @@ import time
 import signal
 from time import time as gettime
 from threading import Lock, Timer, current_thread
+import platform as os_platform
 
 import wx.lib.buttons
 import wx.lib.statbmp
@@ -82,6 +83,11 @@ from IDEFrame import \
     DecodeFileSystemPath
 
 from LocalRuntimeMixin import LocalRuntimeMixin
+
+# Define OpenPLC Editor FileMenu extra items id
+[
+    ID_OPENPLCFILEMENUUPDATE
+] = [wx.NewId() for _init_coll_FileMenu_Items in range(1)]
 
 
 def AppendMenu(parent, help, id, kind, text):
@@ -251,15 +257,15 @@ class Beremiz(IDEFrame, LocalRuntimeMixin):
         parent.AppendSeparator()
         parent.AppendSubMenu(self.TutorialsProjectsMenu, _("&Tutorials and Examples"))
 
-        exemples_dir = Bpath("exemples")
-        project_list = sorted(os.listdir(exemples_dir))
+        examples_dir = Bpath("examples")
+        project_list = sorted(os.listdir(examples_dir))
 
         for idx, dirname  in enumerate(project_list):
             text = '&%d: %s' % (idx + 1, dirname)
 
             item = self.TutorialsProjectsMenu.Append(wx.ID_ANY, text, '')
 
-            projectpath = os.path.join(exemples_dir, dirname)
+            projectpath = os.path.join(examples_dir, dirname)
 
             def OpenExemple(event, projectpath=projectpath):
                 if self.CTR is not None and not self.CheckSaveBeforeClosing():
@@ -287,6 +293,9 @@ class Beremiz(IDEFrame, LocalRuntimeMixin):
         AppendMenu(parent, help='', id=wx.ID_PRINT,
                    kind=wx.ITEM_NORMAL, text=_('Print') + '\tCTRL+P')
         parent.AppendSeparator()
+        AppendMenu(parent, help='', id=ID_OPENPLCFILEMENUUPDATE,
+                   kind=wx.ITEM_NORMAL, text=_(u'Check for updates...') + '\tCTRL+U')
+        parent.AppendSeparator()
         AppendMenu(parent, help='', id=wx.ID_EXIT,
                    kind=wx.ITEM_NORMAL, text=_('Quit') + '\tCTRL+Q')
 
@@ -299,6 +308,7 @@ class Beremiz(IDEFrame, LocalRuntimeMixin):
         self.Bind(wx.EVT_MENU, self.OnPageSetupMenu, id=wx.ID_PAGE_SETUP)
         self.Bind(wx.EVT_MENU, self.OnPreviewMenu, id=wx.ID_PREVIEW)
         self.Bind(wx.EVT_MENU, self.OnPrintMenu, id=wx.ID_PRINT)
+        self.Bind(wx.EVT_MENU, self.OnUpdateMenu, id=ID_OPENPLCFILEMENUUPDATE)
         self.Bind(wx.EVT_MENU, self.OnQuitMenu, id=wx.ID_EXIT)
 
         self.AddToMenuToolBar([(wx.ID_NEW, "new", _('New'), None),
@@ -441,12 +451,19 @@ class Beremiz(IDEFrame, LocalRuntimeMixin):
             # then we prefix CWD to PATH in order to ensure that
             # commands invoked by build process by default are
             # found here.
-            os.environ["PATH"] = os.getcwd()+';'+os.environ["PATH"]
+            #os.environ["PATH"] = os.getcwd()+';'+os.environ["PATH"]
+            os.environ["PATH"] = os.getcwd()+'\\mingw\\bin;'+os.environ["PATH"]
 
     def __init__(self, parent, projectOpen=None, buildpath=None, ctr=None, debug=True, logf=None):
 
         # Add beremiz's icon in top left corner of the frame
-        self.icon = wx.Icon(Bpath("images", "brz.ico"), wx.BITMAP_TYPE_ICO)
+        if os_platform.system() == 'Windows':
+            self.icon = wx.Icon(Bpath("images", "brz.ico"), wx.BITMAP_TYPE_ICO)
+        elif os_platform.system() == 'Darwin':
+            self.icon = wx.Icon(Bpath("images", "brz.ico"), wx.BITMAP_TYPE_ICO)
+        else:
+            self.icon = wx.Icon(Bpath("images", "brz.png"), wx.BITMAP_TYPE_ICO)
+            
         self.__init_execute_path()
 
         IDEFrame.__init__(self, parent, debug)
@@ -510,7 +527,7 @@ class Beremiz(IDEFrame, LocalRuntimeMixin):
         signal.signal(signal.SIGTERM,self.signalTERM_handler)
 
     def RefreshTitle(self):
-        name = _("Beremiz")
+        name = _("OpenPLC Editor")
         if self.CTR is not None:
             projectname = self.CTR.GetProjectName()
             if self.CTR.ProjectTestModified():
@@ -979,12 +996,6 @@ class Beremiz(IDEFrame, LocalRuntimeMixin):
     def OnAboutMenu(self, event):
         info = wx.adv.AboutDialogInfo()
         info = version.GetAboutDialogInfo(info)
-        info.Name = "Beremiz"
-        info.Description = _("Open Source framework for automation, "
-            "implementing IEC 61131 IDE with constantly growing set of extensions "
-            "and flexible PLC runtime.")
-
-        info.Icon = wx.Icon(Bpath("images", "about_brz_logo.png"), wx.BITMAP_TYPE_PNG)
 
         ShowAboutDialog(self, info)
 

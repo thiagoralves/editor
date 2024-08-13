@@ -86,7 +86,7 @@ class FBDVariableDialog(BlockPreviewDialog):
         self.LeftGridSizer.Add(execution_order_label, flag=wx.GROW)
 
         # Create spin control for defining variable execution order
-        self.ExecutionOrder = wx.SpinCtrl(self, min=0, style=wx.SP_ARROW_KEYS)
+        self.ExecutionOrder = wx.SpinCtrl(self, min=0, max=10000, style=wx.SP_ARROW_KEYS)
         self.Bind(wx.EVT_SPINCTRL, self.OnExecutionOrderChanged,
                   self.ExecutionOrder)
         self.LeftGridSizer.Add(self.ExecutionOrder, flag=wx.GROW)
@@ -155,8 +155,13 @@ class FBDVariableDialog(BlockPreviewDialog):
         # Get variable expression and select corresponding value in name list
         # box if it exists
         selected = self.Expression.GetValue()
-        if selected != "" and self.VariableName.FindString(selected) != wx.NOT_FOUND:
-            self.VariableName.SetStringSelection(selected)
+        if selected != "":
+            itemIndex = self.VariableName.FindString(selected, True) 
+            if itemIndex != wx.NOT_FOUND:
+                self.VariableName.SetSelection(itemIndex)
+                #self.VariableName.SetStringSelection(selected) - wx.ListBox.SetStringSelection is broken on macOS
+            else:
+                self.VariableName.SetSelection(wx.NOT_FOUND)
         else:
             self.VariableName.SetSelection(wx.NOT_FOUND)
 
@@ -185,8 +190,10 @@ class FBDVariableDialog(BlockPreviewDialog):
                 # Set expression text control value
                 self.Expression.ChangeValue(value)
                 # Select corresponding text in name list box if it exists
-                if self.VariableName.FindString(value) != wx.NOT_FOUND:
-                    self.VariableName.SetStringSelection(value)
+                itemIndex = self.VariableName.FindString(value, True)
+                if itemIndex != wx.NOT_FOUND:
+                    self.VariableName.SetSelection(itemIndex)
+                    #self.VariableName.SetStringSelection(value, True) - wx.ListBox.SetStringSelection is broken on macOS
                 else:
                     self.VariableName.SetSelection(wx.NOT_FOUND)
 
@@ -265,7 +272,7 @@ class FBDVariableDialog(BlockPreviewDialog):
         """
         # Select the corresponding value in name list box if it exists
         self.VariableName.SetSelection(
-            self.VariableName.FindString(self.Expression.GetValue()))
+            self.VariableName.FindString(self.Expression.GetValue(), True))
 
         self.Refresh()
         event.Skip()

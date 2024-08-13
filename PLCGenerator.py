@@ -31,6 +31,7 @@ from functools import reduce
 from plcopen import PLCOpenParser
 from plcopen.structures import *
 from plcopen.types_enums import *
+import util.py2sort
 
 
 # Dictionary associating PLCOpen variable categories to the corresponding
@@ -1052,7 +1053,7 @@ class PouProgramGenerator(object):
                             self.Program += [(self.CurrentIndent, ())]
                             self.Program += [(instance.getvariable(), coil_info + ("reference",))]
                             self.Program += [(" := ", ())] + expression + [(";\n", ())]
-
+    
     def FactorizePaths(self, paths):
         same_paths = {}
         uncomputed_index = list(range(len(paths)))
@@ -1077,7 +1078,8 @@ class PouProgramGenerator(object):
                     uncomputed_index.remove(num)
         for num in uncomputed_index:
             factorized_paths.append(paths[num])
-        factorized_paths.sort()
+        
+        factorized_paths = util.py2sort.python2sort(factorized_paths)
         return factorized_paths
 
     def GenerateBlock(self, block, block_infos, body, link, order=False, to_inout=False):

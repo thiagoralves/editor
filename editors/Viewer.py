@@ -744,6 +744,7 @@ class Viewer(EditorPanel, DebugViewer):
         self.Editor.Bind(wx.EVT_MOUSEWHEEL, self.OnMouseWheelWindow)
         self.Editor.Bind(wx.EVT_SIZE, self.OnMoveWindow)
         self.Editor.Bind(wx.EVT_MOUSE_EVENTS, self.OnViewerMouseEvent)
+        self.Editor.Bind(wx.EVT_MOUSE_CAPTURE_LOST, lambda evt: None)
 
     def SetCurrentCursor(self, cursor):
         if self.Mode != MODE_MOTION:
@@ -1547,11 +1548,20 @@ class Viewer(EditorPanel, DebugViewer):
 
         def ForceVariableFunction(event):
             if iec_type is not None:
-                dialog = ForceVariableDialog(self.ParentWindow, iec_type, str(element.GetValue()))
+                #dialog = ForceVariableDialog(self.ParentWindow, iec_type, str(element.GetValue()))
+                dialog = ForceVariableDialog(self.ParentWindow, iec_type, "0")
                 if dialog.ShowModal() == wx.ID_OK:
                     self.ParentWindow.AddDebugVariable(iec_path)
                     self.ForceDataValue(iec_path, dialog.GetValue())
         return ForceVariableFunction
+    
+    def GetForceBoolFunction(self, iec_path, element_state):
+        iec_type = self.GetDataType(iec_path)
+        def ForceBoolFunction(event):
+            if iec_type is not None:
+                self.ParentWindow.AddDebugVariable(iec_path)
+                self.ForceDataValue(iec_path, element_state)
+        return ForceBoolFunction
 
     def GetReleaseVariableMenuFunction(self, iec_path):
         def ReleaseVariableFunction(event):
@@ -1572,11 +1582,12 @@ class Viewer(EditorPanel, DebugViewer):
         iec_path = self.GetElementIECPath(self.SelectedElement)
         if iec_path is not None:
             menu = wx.Menu(title='')
-            item = self.AppendItem(menu,
-                _("Force value"),
-                self.GetForceVariableMenuFunction(
-                    iec_path.upper(),
-                    self.SelectedElement))
+            true_item = self.AppendItem(menu, 
+                _("Force True"), 
+                self.GetForceBoolFunction(iec_path.upper(), True))
+            false_item = self.AppendItem(menu, 
+                _("Force False"), 
+                self.GetForceBoolFunction(iec_path.upper(), False))
 
             ritem = self.AppendItem(menu,
                 _("Release value"),
@@ -1589,6 +1600,41 @@ class Viewer(EditorPanel, DebugViewer):
                 self.Editor.ReleaseMouse()
             self.Editor.PopupMenu(menu)
             menu.Destroy()
+        else:
+            #This still could be a variable or a coil
+            if isinstance(self.SelectedElement, FBD_Variable):
+                instance_path = self.GetInstancePath(True)
+                iec_path = "%s.%s" % (instance_path, self.SelectedElement.GetName())
+                menu = wx.Menu(title='')
+                item = self.AppendItem(menu,
+                    _("Force value"),
+                    self.GetForceVariableMenuFunction(iec_path.upper(), self.SelectedElement))
+                ritem = self.AppendItem(menu,
+                    _("Release value"),
+                    self.GetReleaseVariableMenuFunction(iec_path.upper()))
+                if self.Editor.HasCapture():
+                    self.Editor.ReleaseMouse()
+                self.Editor.PopupMenu(menu)
+                menu.Destroy()
+                
+            if isinstance(self.SelectedElement, LD_Coil):
+                instance_path = self.GetInstancePath(True)
+                iec_path = "%s.%s" % (instance_path, self.SelectedElement.GetName())
+                menu = wx.Menu(title='')
+                true_item = self.AppendItem(menu, 
+                    _("Force True"), 
+                    self.GetForceBoolFunction(iec_path.upper(), True))
+                false_item = self.AppendItem(menu, 
+                    _("Force False"), 
+                    self.GetForceBoolFunction(iec_path.upper(), False))
+                ritem = self.AppendItem(menu,
+                    _("Release value"),
+                    self.GetReleaseVariableMenuFunction(iec_path.upper()))
+                if self.Editor.HasCapture():
+                    self.Editor.ReleaseMouse()
+                self.Editor.PopupMenu(menu)
+                menu.Destroy()
+
 
     def PopupBlockMenu(self, connector=None):
         menu = wx.Menu(title='')

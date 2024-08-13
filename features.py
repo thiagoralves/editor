@@ -10,11 +10,12 @@
 
 libraries = [
     ('Native', 'NativeLib.NativeLibrary', True),
-    ('Python', 'py_ext.PythonLibrary', True),
+    ('Python', 'py_ext.PythonLibrary', False),
     ('Etherlab', 'etherlab.EthercatMaster.EtherlabLibrary', False),
     ('SVGHMI', 'svghmi.SVGHMILibrary', False)]
 
-catalog = [
+catalog = [('arduino_ext', _('Arduino extension'), _('Add Arduino Sketch to the PLC project'), 'arduino_ext.CFile')]
+"""
     ('opcua', _('OPC-UA client'), _('Map OPC-UA server as located variables'), 'opc_ua.OPCUAClient'),
     ('canfestival', _('CANopen support'), _('Map located variables over CANopen'), 'canfestival.canfestival.RootClass'),
     ('bacnet', _('Bacnet support'), _('Map located variables over Bacnet'), 'bacnet.bacnet.RootClass'),
@@ -24,5 +25,6 @@ catalog = [
     ('py_ext', _('Python file'), _('Add Python code executed asynchronously'), 'py_ext.PythonFile'),
     ('wxglade_hmi', _('WxGlade GUI'), _('Add a simple WxGlade based GUI.'), 'wxglade_hmi.WxGladeHMI'),
     ('svghmi', _('SVGHMI'), _('SVG based HMI'), 'svghmi.SVGHMI')]
+"""
 
 file_editors = []
