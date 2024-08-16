@@ -43,9 +43,9 @@ void hardwareInit()
     for (int i = 0; i < NUM_ANALOG_OUTPUT; i++)
     {
         pinMode(pinMask_AOUT[i], OUTPUT);
-        //#if !SOC_DAC_SUPPORTED
-        //ledcAttach(pinMask_AOUT[i], PWM_ANALOG_FREQ, PWM_RESOLUTION);
-        //#endif
+//#if !SOC_DAC_SUPPORTED
+//        ledcAttach(pinMask_AOUT[i], PWM_ANALOG_FREQ, PWM_RESOLUTION);
+//#endif
     }
 }
 
@@ -70,12 +70,14 @@ void updateInputBuffers()
 {
     for (int i = 0; i < NUM_DISCRETE_INPUT; i++)
     {
-        *bool_input[i/8][i%8] = digitalRead(pinMask_DIN[i]);
+        if (bool_input[i/8][i%8] != NULL)
+            *bool_input[i/8][i%8] = digitalRead(pinMask_DIN[i]);
     }
 
     for (int i = 0; i < NUM_ANALOG_INPUT; i++)
     {
-        *int_input[i] = (analogRead(pinMask_AIN[i]) * 16);
+        if (int_input[i] != NULL)
+            *int_input[i] = (analogRead(pinMask_AIN[i]) * 64);
     }
 }
 
@@ -83,15 +85,20 @@ void updateOutputBuffers()
 {
     for (int i = 0; i < NUM_DISCRETE_OUTPUT; i++)
     {
-        digitalWrite(pinMask_DOUT[i], *bool_output[i/8][i%8]);
+        if (bool_output[i/8][i%8] != NULL)
+            digitalWrite(pinMask_DOUT[i], *bool_output[i/8][i%8]);
     }
 
     for (int i = 0; i < NUM_ANALOG_OUTPUT; i++)
     {
-        #if SOC_DAC_SUPPORTED
-        dacWrite(pinMask_AOUT[i], (*int_output[i] / 256));
-        //#else
-        //ledcWrite(pinMask_AOUT[i], (*int_output[i] / 16));
-        #endif
+        if (int_output[i] != NULL)
+        {
+            analogWrite(pinMask_AOUT[i], (*int_output[i] / 64));
+#if SOC_DAC_SUPPORTED
+            dacWrite(pinMask_AOUT[i], (*int_output[i] / 256));
+//#else
+//            ledcWrite(pinMask_AOUT[i], (*int_output[i] / 16));
+#endif
+        }
     }
 }
