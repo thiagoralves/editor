@@ -7,3 +7,15 @@
 **/my_*.der
 **/my_*.pem
 tests/tools/Docker/requirements.txt
+arduino/src/Config0.c
+arduino/src/Config0.h
+arduino/src/LOCATED_VARIABLES.h
+arduino/src/POUS.c
+arduino/src/POUS.h
+arduino/src/Res0.c
+arduino/src/VARIABLES.csv
+arduino/src/arduino.cpp
+arduino/src/plc_prog.st
+arduino/examples/Baremetal/defines.h
+arduino/src/debug.c
+arduino/src/glueVars.c
