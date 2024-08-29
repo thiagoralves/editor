@@ -529,6 +529,8 @@ class ArduinoUploadDialog(wx.Dialog):
 
         #Update IOs
         board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
+        if board_type not in self.hals:
+            board_type = next(iter(self.hals))
         board_din = self.settings.get('user_din', self.hals[board_type]["default_din"])
         board_ain = self.settings.get('user_ain', self.hals[board_type]["default_ain"])
         board_dout = self.settings.get('user_dout', self.hals[board_type]["default_dout"])
@@ -693,7 +695,7 @@ class ArduinoUploadDialog(wx.Dialog):
         f.close()
 
     def saveSettings(self, event=None):
-        self.settings['board_type'] = self.board_type_combo.GetValue()
+        self.settings['board_type'] = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
         self.settings['user_din'] = str(self.din_txt.GetValue())
         self.settings['user_ain'] = str(self.ain_txt.GetValue())
         self.settings['user_dout'] = str(self.dout_txt.GetValue())
