@@ -378,6 +378,21 @@
     "source": "fx3u-14-WS3U.cpp",
     "version": "0"
   },
+  "FX3U-24MR / DollaTek": {
+    "platform": "STMicroelectronics:stm32:GenF1:pnum=GENERIC_F103VCTX,upload_method=serialMethod",
+    "source": "fx3u-24MR-DT.cpp",
+    "version": "2.8.1",
+    "last_update": 0,
+    "core": "STMicroelectronics:stm32",
+    "default_din": "PB13, PB14, PB11, PB12, PE15, PB10, PE13, PE14, PE11, PE12, PE9, PE10, PE7, PE8",
+    "default_ain": "PA1, PA3, PC4, PC5, PC0, PC1",
+    "default_dout": "PC9, PC8, PA8, PA0, PB3, PD12, PB15, PA7, PA6, PA2",
+    "default_aout": "PA4, PA5",
+    "user_din": "PB13, PB14, PB11, PB12, PE15, PB10, PE13, PE14, PE11, PE12, PE9, PE10, PE7, PE8",
+    "user_ain": "PA1, PA3, PC4, PC5, PC0, PC1",
+    "user_dout": "PC9, PC8, PA8, PA0, PB3, PD12, PB15, PA7, PA6, PA2",
+    "user_aout": "PA4, PA5"
+  },
   "Iruino VEA": {
     "core": "iruino:esp32",
     "default_ain": "A0, A1",
