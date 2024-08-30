@@ -132,6 +132,18 @@
     "source": "uno_leonardo_nano_micro_zero.cpp",
     "version": "0"
   },
+  "Blackpill STM32-F411CE (DFU STM32 Bootloader)": {
+    "core": "STMicroelectronics:stm32",
+    "default_ain": "PA0, PA1, PA4, PA5, PA6, PA7",
+    "default_aout": "PB0, PB1",
+    "default_din": "PA8, PA11, PA12, PB3, PB4, PB5, PB8, PB9",
+    "default_dout": "PB10, PB12, PB13, PB14, PB15, PC13, PC14, PC15",
+    "define": "BOARD_STM32_F411CE",
+    "last_update": 0,
+    "platform": "STMicroelectronics:stm32:GenF4:pnum=BLACKPILL_F411CE,upload_method=dfuMethod,usb=CDCgen",
+    "source": "stm32_f411ce.cpp",
+    "version": "0"
+  },
   "Blackpill STM32-F411CE (HID Bootloader 2.2)": {
     "core": "STMicroelectronics:stm32",
     "default_ain": "PA0, PA1, PA4, PA5, PA6, PA7",
@@ -166,6 +178,18 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF4:pnum=BLACKPILL_F411CE,upload_method=serialMethod,usb=CDCgen",
     "source": "stm32_f411ce.cpp",
+    "version": "0"
+  },
+  "Bluepill STM32-F103CB (DFU STM32 Bootloader)": {
+    "core": "STMicroelectronics:stm32",
+    "default_ain": "PA0, PA1, PA4, PA5, PA6, PA7",
+    "default_aout": "PB0, PB1",
+    "default_din": "PA8, PA11, PA12, PB3, PB4, PB5, PB8, PB9, PB10",
+    "default_dout": "PB11, PB12, PB13, PB14, PB15, PC13, PC14, PC15",
+    "define": "BOARD_STM32_F103CB",
+    "last_update": 0,
+    "platform": "STMicroelectronics:stm32:GenF1:pnum=BLUEPILL_F103C8,upload_method=dfuMethod,usb=CDCgen",
+    "source": "stm32_f103cb.cpp",
     "version": "0"
   },
   "Bluepill STM32-F103CB (HID Bootloader 2.2)": {
