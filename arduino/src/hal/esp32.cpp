@@ -42,10 +42,29 @@ void hardwareInit()
 
     for (int i = 0; i < NUM_ANALOG_OUTPUT; i++)
     {
-        pinMode(pinMask_AOUT[i], OUTPUT);
-//#if !SOC_DAC_SUPPORTED
-//        ledcAttach(pinMask_AOUT[i], PWM_ANALOG_FREQ, PWM_RESOLUTION);
-//#endif
+
+/* 	It’s assumed that cards with real DAC’s only have two channels and they are the first two assigned pins in the HAL file or 
+    the IDE config. More than two defined pins are assumed to be PWM analog channels.
+     Modified the line below so if the card has a real DAC the output gets set as an output, if not its set for PWM output
+	If the card does not have a real DAC all defined analog output pins ar set for PWM
+*/
+
+#if (SOC_DAC_SUPPORTED)
+
+    
+	if (i < 2)
+		{ 
+			 pinMode(pinMask_AOUT[i], OUTPUT);
+		}
+	else	{	
+				ledcAttach(pinMask_AOUT[i], PWM_ANALOG_FREQ, PWM_RESOLUTION);
+
+		}
+#else
+
+	ledcAttach(pinMask_AOUT[i], PWM_ANALOG_FREQ, PWM_RESOLUTION);
+#endif
+
     }
 }
 
@@ -77,7 +96,7 @@ void updateInputBuffers()
     for (int i = 0; i < NUM_ANALOG_INPUT; i++)
     {
         if (int_input[i] != NULL)
-            *int_input[i] = (analogRead(pinMask_AIN[i]) * 64);
+            *int_input[i] = (analogRead(pinMask_AIN[i]) * 16); // changed from 64 to 16 
     }
 }
 
@@ -93,12 +112,23 @@ void updateOutputBuffers()
     {
         if (int_output[i] != NULL)
         {
-            analogWrite(pinMask_AOUT[i], (*int_output[i] / 64));
-#if SOC_DAC_SUPPORTED
-            dacWrite(pinMask_AOUT[i], (*int_output[i] / 256));
-//#else
-//            ledcWrite(pinMask_AOUT[i], (*int_output[i] / 16));
+// Modified the line below so if the loop index "i" is < 2 that means the channel is a real DAC if > 2 then its a PWM analog output
+
+#if (SOC_DAC_SUPPORTED )
+            
+		if (i < 2)
+			{
+				dacWrite(pinMask_AOUT[i], (*int_output[i] / 256));
+			}
+		else	{
+						ledcWrite(pinMask_AOUT[i], (*int_output[i] / 16));
+			}
+			
+				
+#else
+            ledcWrite(pinMask_AOUT[i], (*int_output[i] / 16));
 #endif
+
         }
     }
 }

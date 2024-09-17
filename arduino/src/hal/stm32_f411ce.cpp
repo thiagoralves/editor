@@ -22,6 +22,13 @@ uint8_t pinMask_AOUT[] = {PINMASK_AOUT};
 
 void hardwareInit()
 {
+
+    // Added the next three lines to configure the analog read and write resolution to 12 bit and set the PWM carrier frequency to 4000 HZ	
+
+	analogReadResolution(12);
+	analogWriteResolution(12);
+	analogWriteFrequency(4000);
+
     for (int i = 0; i < NUM_DISCRETE_INPUT; i++)
     {
         pinMode(pinMask_DIN[i], INPUT);
@@ -68,6 +75,6 @@ void updateOutputBuffers()
     for (int i = 0; i < NUM_ANALOG_OUTPUT; i++)
     {
         if (int_output[i] != NULL)
-            analogWrite(pinMask_AOUT[i], (*int_output[i] / 256));
+            analogWrite(pinMask_AOUT[i], (*int_output[i] / 16)); // Changed from divide by 256 to divide by 16
     }
 }

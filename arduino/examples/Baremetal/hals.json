@@ -380,6 +380,18 @@
     "source": "esp8266.cpp",
     "version": "0"
   },
+  "ESP32-C6-DevKitC-1 V1.2": {
+    "core": "esp32:esp32",
+    "default_ain": "0, 1, 2, 3",
+    "default_aout": "18, 19, 20, 21",
+    "default_din": "4, 5, 10, 11",
+    "default_dout": "15, 9, 22, 23, 39",
+    "define": "BOARD_ESP32",
+    "last_update": 0,
+    "platform": "esp32:esp32:esp32c6",
+    "source": "esp32.cpp",
+    "version": "3.0.4"
+  },
   "FX3U-14M / LE3U-14M": {
     "core": "STMicroelectronics:stm32",
     "default_ain": "A0, A1, A2, A3",
