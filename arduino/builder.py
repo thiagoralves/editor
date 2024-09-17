@@ -354,7 +354,7 @@ void glueVars()
                     glueVars += '    lint_memory[' + \
                         var_address + '] = ' + var_name + ';\n'
                 else:
-                    append_compiler_log(txtCtrl, _('Could not process location "{var_name}" from line: {var_line_text}').format(var_name=var_name, located_var=located_var) + '\n')
+                    append_compiler_log(txtCtrl, _('Could not process location "{var_name}" from line: {var_line_text}').format(var_name=var_name, var_line_text=located_var) + '\n')
                     return
 
     glueVars += """
