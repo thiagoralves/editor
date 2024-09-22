@@ -58,7 +58,7 @@ def read_output(process, txtCtrl, timeout=None):
     while True:
         output = process.stdout.readline()
         if output:
-            append_compiler_log(txtCtrl, output.decode('UTF-8', errors='backslashreplace'))
+            append_compiler_log(txtCtrl, output)
             wx.YieldIfNeeded()
 
         # check for process exit
@@ -66,7 +66,7 @@ def read_output(process, txtCtrl, timeout=None):
         if poll_result is not None:
             # process terminated, read remaining output data
             for line in process.stdout:
-                append_compiler_log(txtCtrl, line.decode('UTF-8', errors='backslashreplace'))
+                append_compiler_log(txtCtrl, line)
                 wx.YieldIfNeeded()
             return_code = poll_result
             break
@@ -86,13 +86,25 @@ def read_output(process, txtCtrl, timeout=None):
 def runCommandToWin(txtCtrl, command, cwd=None, timeout=None):
     return_code = -2  # default value for unexpected errors
     append_compiler_log(txtCtrl, '$ ' + ' '.join(map(str, command)) + '\n')
+
+    popenargs = {
+            "cwd":    os.getcwd() if cwd is None else cwd,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.STDOUT,
+            "bufsize": 1,
+            "universal_newlines": True,
+            "close_fds": True,
+            "encoding": "utf-8",
+            "errors": "backslashreplace"
+        }
+
     try:
-        if os_platform.system() == 'Windows':
-            compilation = subprocess.Popen(command, cwd=cwd, creationflags=0x08000000, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        elif os_platform.system() == 'Darwin':
-            compilation = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        else:
-            compilation = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        # add extra flags for Windows
+        if os.name in ("nt", "ce"):
+            popenargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+        # start the sub process
+        compilation = subprocess.Popen(command, **popenargs)
 
         return_code = read_output(compilation, txtCtrl, timeout)
         append_compiler_log(txtCtrl, '$? = ' + str(return_code) + '\n')

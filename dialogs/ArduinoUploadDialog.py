@@ -864,7 +864,7 @@ class ArduinoUploadDialog(wx.Dialog):
             return
 
         # Build list of all installed cores
-        lines = core_list.split('\n')
+        lines = core_list.splitlines()
         if (len(lines) < 2):
             print("Error building list of installed platforms")
             return
