@@ -3,6 +3,8 @@ import os
 import platform as os_platform
 import shutil
 import subprocess
+import multiprocessing as os_multiprocessing
+from datetime import datetime
 import sys
 import time
 import select
@@ -11,13 +13,24 @@ import wx
 global compiler_logs
 compiler_logs = ''
 
+global base_path
+base_path = 'editor/arduino/src/'
 
 def append_compiler_log(txtCtrl, output):
     global compiler_logs
     compiler_logs += output
+
+    log_file_path = os.path.join(base_path, 'build.log')
+    try:
+        with open(log_file_path, 'a', newline='') as log_file:
+            lines = output.splitlines()
+            for line in lines:
+                timestamp = datetime.now().isoformat(timespec='milliseconds')
+                log_file.write(f"[{timestamp}] {line}\n")
+    except IOError as e:
+        print(f"Fehler beim Schreiben in die Logdatei: {e}")
+
     def update():
-        #if os_platform.system() != 'Darwin':
-        #    txtCtrl.SetInsertionPoint(-1)
         txtCtrl.SetValue(compiler_logs)
         txtCtrl.ShowPosition(txtCtrl.GetLastPosition())
         txtCtrl.Refresh()
@@ -65,7 +78,7 @@ def read_output(process, txtCtrl, timeout=None):
             break
 
         # brief sleep to reduce CPU load
-        time.sleep(0.1)
+        time.sleep(0.02)
 
     return return_code
 
@@ -90,9 +103,73 @@ def runCommandToWin(txtCtrl, command, cwd=None, timeout=None):
 
     return return_code
 
+def log_host_info(txtCtrl):
+    # Number of logical CPU cores
+    logical_cores = os_multiprocessing.cpu_count()
+
+    # System architecture
+    architecture = os_platform.architecture()[0]
+
+    # Processor name
+    processor = os_platform.processor()
+
+    # Operating system
+    os_name = os_platform.system()
+
+    append_compiler_log(txtCtrl, f"Host architecture: {architecture}\n")
+    append_compiler_log(txtCtrl, f"Processor: {processor}\n")
+    append_compiler_log(txtCtrl, f"Logical CPU cores: {logical_cores}\n")
+    append_compiler_log(txtCtrl, f"Operating system: {os_name}\n")
+
+    # Additional information for Linux systems
+    if os_name == "Linux":
+        try:
+            with open("/proc/cpuinfo", "r") as f:
+                cpu_info = f.read()
+
+            # Physical cores (rough estimate)
+            physical_cores = len([line for line in cpu_info.split('\n') if line.startswith("physical id")])
+            append_compiler_log(txtCtrl, f"Estimated physical CPU cores: {physical_cores or 'Not available'}\n")
+
+            # CPU frequency
+            cpu_mhz = [line for line in cpu_info.split('\n') if "cpu MHz" in line]
+            if cpu_mhz:
+                append_compiler_log(txtCtrl, f"CPU frequency: {cpu_mhz[0].split(':')[1].strip()} MHz\n")
+            else:
+                append_compiler_log(txtCtrl, "CPU frequency: Not available\n")
+
+        except Exception as e:
+            append_compiler_log(txtCtrl, f"Error reading /proc/cpuinfo: {e}\n")
+
+    # Additional information for macOS systems
+    elif os_name == "Darwin":  # Darwin is the core of macOS
+        try:
+            # Physical cores
+            physical_cores = int(subprocess.check_output(["sysctl", "-n", "hw.physicalcpu"]).decode().strip())
+            append_compiler_log(txtCtrl, f"Physical CPU cores: {physical_cores}\n")
+
+            # CPU frequency
+            cpu_freq = subprocess.check_output(["sysctl", "-n", "hw.cpufrequency"]).decode().strip()
+            cpu_freq_mhz = int(cpu_freq) / 1000000  # Convert Hz to MHz
+            append_compiler_log(txtCtrl, f"CPU frequency: {cpu_freq_mhz:.2f} MHz\n")
+
+            # CPU model
+            cpu_model = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"]).decode().strip()
+            append_compiler_log(txtCtrl, f"CPU model: {cpu_model}\n")
+
+        except Exception as e:
+            append_compiler_log(txtCtrl, f"Error getting macOS CPU info: {e}\n")
+
+    path_content = os.environ.get('PATH', '')
+    append_compiler_log(txtCtrl, "\nactive PATH Variable:\n" + path_content + "\n\n")
+
+
 def build(st_file, platform, source_file, port, txtCtrl, hals, update_subsystem):
+    global base_path
     global compiler_logs
     compiler_logs = ''
+
+    log_host_info(txtCtrl)
 
     #Check if board is installed
     board_installed = False
