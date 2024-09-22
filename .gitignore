@@ -19,3 +19,4 @@ arduino/src/plc_prog.st
 arduino/examples/Baremetal/defines.h
 arduino/src/debug.c
 arduino/src/glueVars.c
+/arduino/src/build.log
