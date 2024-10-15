@@ -1606,9 +1606,19 @@ class ProjectController(ConfigTreeNode, PLCControler):
         self._CloseView(self._IECCodeView)
         if os.path.isdir(os.path.join(self._getBuildPath())):
             self.logger.write(_("Cleaning the build directory\n"))
-            shutil.rmtree(os.path.join(self._getBuildPath()))
+            try:
+                shutil.rmtree(os.path.join(self._getBuildPath()))
+            except OSError as e:
+                # Handle and log specific OS-related errors
+                self.logger.write_error(f"Failed to clean the project build folder: {e.filename}\n")
+                self.logger.write_error(f"{e.strerror} (Error Code: {e.errno})\n")
+                self.logger.write_error("Try to manually remove the build folder inside your project path if you have issues during compilation\n")
+            except Exception as e:
+                # Catch any other unexpected exceptions
+                self.logger.write_error(f"An unexpected error occurred while cleaning the build folder: {str(e)}\n")
+                self.logger.write_error("Try to manually remove the build folder inside your project path if you have issues during compilation\n")
         else:
-            self.logger.write_error(_("Build directory already clean\n"))
+            self.logger.write(_("Build directory already clean\n"))
         # kill the builder
         self._builder = None
         self.CompareLocalAndRemotePLC()
