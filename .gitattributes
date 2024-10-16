@@ -1,0 +1,7 @@
+* text=auto
+*.py text
+*.ino text
+*.c text
+*.cpp text
+*.cc text
+*.h text

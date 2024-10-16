@@ -1,6 +1,7 @@
 import re
 import datetime
 import threading
+import queue
 import serial.tools.list_ports
 from builtins import str as text
 from arduino import builder
@@ -22,6 +23,13 @@ import glob
 
 class ArduinoUploadDialog(wx.Dialog):
     """Dialog to configure upload parameters"""
+    BUILD_OPTIONS = [
+            (_("Use build cache"), builder.BuildCacheOption.USE_CACHE),
+            (_("Clean build cache"), builder.BuildCacheOption.CLEAN_BUILD),
+            (_("Clean build cache, reinstall libaries"), builder.BuildCacheOption.CLEAN_LIB),
+            (_("Mr. Proper (Clean, reinstall boards and libraries)"), builder.BuildCacheOption.CLEAN_ALL)
+        ]
+
 
     def __init__(self, parent, st_code, arduino_ext, md5, project_controller):
         """
@@ -33,12 +41,14 @@ class ArduinoUploadDialog(wx.Dialog):
         self.arduino_sketch = arduino_ext
         self.md5 = md5
         self.last_update = 0
-        self.settings = {}
         self.update_subsystem = True
+        self.settings = {}
         current_dir = paths.AbsDir(__file__)
         self.com_port_combo_choices = {}
         self.project_controller = project_controller
         self.settings = self.project_controller.GetArduinoSettings()
+        self.active_build_option = builder.BuildCacheOption.USE_CACHE  # Set "Use build cache" as default
+        self.workaround_macos = platform.system() == 'Darwin'
 
         wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = _('Transfer Program to PLC'), pos = wx.DefaultPosition, style = wx.DEFAULT_DIALOG_STYLE )
 
@@ -111,7 +121,25 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.m_listbook2.AssignImageList(m_listbook2Images)
         self.m_panel5 = wx.Panel(self.m_listbook2, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL)
+
+        # Create a vertical sizer as container for the widgets below
         bSizer21 = wx.BoxSizer(wx.VERTICAL)
+
+        # Create a horizontal sizer for the radio buttons
+        hSizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # Create radio buttons
+        self.build_options = wx.RadioBox(
+            self.m_panel5, wx.ID_ANY, "", wx.DefaultPosition, wx.DefaultSize,
+            [option[0] for option in self.BUILD_OPTIONS],
+            4, wx.RA_SPECIFY_COLS | wx.NO_BORDER
+        )
+
+        self.build_options.SetSelection(0)
+        self.build_options.Bind(wx.EVT_RADIOBOX, self.onBuildCacheOptionChange)
+        hSizer.Add(self.build_options, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, 15)
+
+        bSizer21.Add(hSizer, 0, wx.EXPAND)
 
         self.check_compile = wx.CheckBox(self.m_panel5, wx.ID_ANY, _('Compile Only'), wx.DefaultPosition, wx.DefaultSize, 0)
         bSizer21.Add(self.check_compile, 0, wx.LEFT, 15)
@@ -131,6 +159,18 @@ class ArduinoUploadDialog(wx.Dialog):
         self.output_text.SetDefaultStyle(wx.TextAttr(wx.WHITE))
 
         bSizer21.Add(self.output_text, 0, wx.ALL|wx.EXPAND, 5)
+
+        # define an application specific event for alerting the GUI thread of new output
+        self.text_output_event = wx.NewEventType()
+        self.text_output_event_binder = wx.PyEventBinder(self.text_output_event, 1)
+        self.Bind(self.text_output_event_binder, self.on_text_output_event)
+
+        # define the text communication queue
+        self.text_queue = queue.Queue()
+
+        # timer for the MacOS scrolling issue workaround
+        self.scroll_timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.on_scroll_timer, self.scroll_timer)
 
         self.upload_button = wx.Button(self.m_panel5, wx.ID_ANY, _('Transfer to PLC'), wx.DefaultPosition, wx.DefaultSize, 0)
         self.upload_button.SetMinSize(wx.Size(150,30))
@@ -205,9 +245,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         gSizer1.Add( self.m_button3, 0, wx.ALIGN_CENTER|wx.ALL, 5 )
 
-
         bSizer3.Add( gSizer1, 1, wx.EXPAND, 5 )
-
 
         self.m_panel6.SetSizer( bSizer3 )
         self.m_panel6.Layout()
@@ -445,6 +483,8 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.loadSettings()
 
+        self.set_build_option(self.active_build_option)
+
     def __del__( self ):
         pass
 
@@ -481,6 +521,10 @@ class ArduinoUploadDialog(wx.Dialog):
         self.settings.pop('user_dout', None);
         self.settings.pop('user_aout', None);
         self.onUIChange(e)
+
+    def onBuildCacheOptionChange(self, event):
+        selected = self.build_options.GetSelection()
+        self.active_build_option = self.BUILD_OPTIONS[selected][1]
 
     def onUIChange(self, e):
         # Update Comms
@@ -541,6 +585,33 @@ class ArduinoUploadDialog(wx.Dialog):
         self.dout_txt.SetValue(str(board_dout))
         self.aout_txt.SetValue(str(board_aout))
 
+    def send_output_text(self, output):
+        self.text_queue.put(output)
+        wx.PostEvent(self, wx.PyEvent(eventType=self.text_output_event))
+
+    def on_text_output_event(self, event):
+        while not self.text_queue.empty():
+            try:
+                line = self.text_queue.get_nowait()
+                if line is None:
+                    # end of data
+                    break
+                # we are in the event handler and thus in the GUI thread context, so we are allowed to append the text directly to `output_text`
+                self.output_text.AppendText(line)
+                self.text_queue.task_done()
+                # on MacOS we need a workaround for the problems of wxPython and automatic scolling
+                if self.workaround_macos and not self.scroll_timer.IsRunning():
+                    self.scroll_timer.StartOnce(150)
+            except queue.Empty:
+                break
+
+    def on_scroll_timer(self, event):
+        wx.CallAfter(self.scroll_to_bottom)
+        wx.CallLater(10, self.scroll_to_bottom) # scroll twice, on MacOS this makes scrolling more reliable and smoother
+
+    def scroll_to_bottom(self):
+        self.output_text.ShowPosition(self.output_text.GetLastPosition())
+
     def restoreIODefaults(self, event):
         board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
         #print(f'Restoring IO defaults for "{board_type}"')
@@ -551,8 +622,17 @@ class ArduinoUploadDialog(wx.Dialog):
         self.onUIChange(None)
         self.project_controller.SetArduinoSettingsChanged()
 
-    def startBuilder(self):
+    def set_build_option(self, saved_option: builder.BuildCacheOption):
+        self.active_build_option = saved_option
+        for index, (_ignored, enum_value) in enumerate(self.BUILD_OPTIONS):
+            if enum_value == saved_option:
+                self.build_options.SetSelection(index)
+                break
 
+    def get_current_build_option(self) -> builder.BuildCacheOption:
+        return self.BUILD_OPTIONS[self.build_options.GetSelection()][1]
+
+    def startBuilder(self):
         # Get platform and source_file from hals
         board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
         platform = self.hals[board_type]['platform']
@@ -575,10 +655,21 @@ class ArduinoUploadDialog(wx.Dialog):
             if not port_found:
                 port = selected_port  # Use the user entered value directly
 
-        compiler_thread = threading.Thread(target=builder.build, args=(self.plc_program, platform, source, port, self.output_text, self.hals, self.update_subsystem))
+        if self.update_subsystem:
+            self.active_build_option = builder.BuildCacheOption.CLEAN_ALL
+
+        # create a closure to encapsulate self, later this sends the text on behalf of the thread
+        def send_text(output):
+            self.send_output_text(output)
+
+        # empty the text output for the new build run
+        wx.CallAfter(self.output_text.Clear)
+        wx.YieldIfNeeded()
+
+        # now create the build thread
+        compiler_thread = threading.Thread(target=builder.build, args=(self.plc_program, platform, source, port, send_text, self.hals, self.active_build_option))
         compiler_thread.start()
         compiler_thread.join()
-        wx.CallAfter(self.setUIState, True)
         if (self.update_subsystem):
             self.update_subsystem = False
             self.last_update = time.time()
@@ -586,12 +677,17 @@ class ArduinoUploadDialog(wx.Dialog):
         self.updateInstalledBoards()
         self.loadSettings() # Get the correct board name if an update or install occurred
 
+        # reset the build cache option and enable the UI
+        wx.CallAfter(self.set_build_option, builder.BuildCacheOption.USE_CACHE)
+        wx.CallAfter(wx.CallLater, 100, self.setUIState, True)
+
     def setUIState(self, enabled):
         self.board_type_combo.Enable(enabled)
         self.com_port_combo.Enable(enabled)
         self.reload_button.Enable(enabled)
         self.upload_button.Enable(enabled)
         self.check_compile.Enable(enabled)
+        self.build_options.Enable(enabled)
 
     def OnUpload(self, event):
         self.setUIState(False)
@@ -864,7 +960,7 @@ class ArduinoUploadDialog(wx.Dialog):
             return
 
         # Build list of all installed cores
-        lines = core_list.split('\n')
+        lines = core_list.splitlines()
         if (len(lines) < 2):
             print("Error building list of installed platforms")
             return
