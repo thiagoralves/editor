@@ -836,13 +836,13 @@ class ProjectController(ConfigTreeNode, PLCControler):
 
         IECrawcodepath = self._getIECrawcodepath()
         if os.path.isfile(IECrawcodepath):
-            IECCodeContent += open(IECrawcodepath, "r").read() + "\n"
+            IECCodeContent += open(IECrawcodepath, "r", encoding="utf-8").read() + "\n"
 
 
         # Compute offset before ST resulting of transformation from user POUs
         self.ProgramOffset = IECCodeContent.count("\n")
 
-        POUsIECCodeContent = open(self._getIECgeneratedcodepath(), "r").read()
+        POUsIECCodeContent = open(self._getIECgeneratedcodepath(), "r", encoding="utf-8").read()
 
         IECcodepath = self._getIECcodepath()
 
@@ -851,7 +851,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
 
         fullPLCProg = IECCodeContent + POUsIECCodeContent
 
-        with open(IECcodepath, "w") as plc_file:
+        with open(IECcodepath, "w", encoding="utf-8") as plc_file:
             #plc_file.write(IECCodeContent)
             #plc_file.write(POUsIECCodeContent)
             if self._buildType == "simulator":
@@ -910,7 +910,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
                     first_line, last_line = int(first_line), int(last_line)
 
                     last_section = None
-                    f = open(self._getIECcodepath())
+                    f = open(self._getIECcodepath(), encoding="utf-8")
 
                     for i, line in enumerate(f.readlines()):
                         i = i + 1
@@ -2274,7 +2274,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
             c_debug = 'char md5[] = "' + MD5 + '";\n' + c_debug
 
             # Read ST program
-            f = open(self._getIECgeneratedcodepath(), 'r')
+            f = open(self._getIECgeneratedcodepath(), 'r', encoding="utf-8")
             program = f.read()
             f.close()
 
@@ -2290,7 +2290,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
                                 "OpenPLC Program(*.st)|*.st", wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
             if dlg.ShowModal() == wx.ID_OK:
                 try:
-                    f = open(dlg.GetPath(), "w")
+                    f = open(dlg.GetPath(), "w", encoding="utf-8")
                     f.write(program)
                     f.close()
                     #wx.MessageBox('OpenPLC program generated successfully', 'Info', wx.OK | wx.ICON_INFORMATION)
@@ -2324,7 +2324,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
             self.logger.write("Build MD5: ")
             self.logger.write(MD5)
 
-            f = open(self._getIECgeneratedcodepath(), 'r')
+            f = open(self._getIECgeneratedcodepath(), 'r', encoding="utf-8")
             program = f.read()
             f.close()
 
