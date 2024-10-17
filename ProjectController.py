@@ -2405,7 +2405,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
                 self.logger.write_error("Error building project: md5 object is null\n")
                 return
 
-            if self._connector.MatchMD5(MD5) == True:
+            if self._connector.MatchMD5(MD5, request_type='remote') == True:
                 self.logger.write("Program matches PLC MD5\n")
                 #Transfer PLC program
                 if (self._Transfer() is False):

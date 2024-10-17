@@ -770,15 +770,10 @@ class PLCObject(object):
             self.remote.disconnect()
             self.remote = None
     
-    def MatchMD5(self, MD5):
+    def MatchMD5(self, MD5, request_type='local'):
         ret = None
-        try:
-            last_md5 = open(self._GetMD5FileName(), "r").read()
-            ret = (last_md5 == MD5)
-        except Exception:
-            ret = False
-        
-        if self.DebuggerType == 'remote' and self.remote != None:
+
+        if request_type == 'remote' and self.remote != None: #self.DebuggerType == 'remote' and self.remote != None:
             # Older boards need some love. Let's send them love 10 times
             targetMD5 = None
             max_tries = 10
@@ -788,14 +783,21 @@ class PLCObject(object):
                 sleep(0.3)
                     
             if targetMD5 == None:
+                self.LogMessage("Unable to read MD5 from target")
                 return False
             else:
                 if targetMD5 == MD5:
                     return True
                 else:
+                    self.LogMessage("Incorrect MD5! Expected: " + str(MD5) + "  Received: " + str(targetMD5))
                     return False
-        
-        return ret
+        else:
+            try:
+                last_md5 = open(self._GetMD5FileName(), "r").read()
+                return(last_md5 == MD5)
+            except Exception:
+                return False
+
 
     @RunInMain
     def SetTraceVariablesList(self, idxs):

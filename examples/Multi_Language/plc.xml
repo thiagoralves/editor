@@ -1333,7 +1333,7 @@ ST Out
   </types>
   <instances>
     <configurations>
-      <configuration name="config">
+      <configuration name="Config0">
         <resource name="Res0">
           <task name="plc_task" priority="1" interval="T#100ms">
             <pouInstance name="plc_task_instance" typeName="plc_prg"/>
