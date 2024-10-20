@@ -167,6 +167,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         # define the text communication queue
         self.text_queue = queue.Queue()
+        self.last_output_time = None
 
         # timer for the MacOS scrolling issue workaround
         self.scroll_timer = wx.Timer(self)
@@ -585,29 +586,52 @@ class ArduinoUploadDialog(wx.Dialog):
         self.dout_txt.SetValue(str(board_dout))
         self.aout_txt.SetValue(str(board_aout))
 
-    def send_output_text(self, output):
+    def send_output_text(self, output, drainOutput = False):
         self.text_queue.put(output)
-        wx.PostEvent(self, wx.PyEvent(eventType=self.text_output_event))
+        if not self.scroll_timer.IsRunning():
+            wx.PostEvent(self, wx.PyEvent(eventType=self.text_output_event))
+        if drainOutput:
+            while not self.text_queue.empty():
+                wx.YieldIfNeeded()
+                time.sleep(0.1)
 
     def on_text_output_event(self, event):
+        lines = []
+        sampleTime = 400
+        current_time = time.time()
         while not self.text_queue.empty():
             try:
                 line = self.text_queue.get_nowait()
                 if line is None:
                     # end of data
                     break
-                # we are in the event handler and thus in the GUI thread context, so we are allowed to append the text directly to `output_text`
-                self.output_text.AppendText(line)
+                lines.append(line)
                 self.text_queue.task_done()
-                # on MacOS we need a workaround for the problems of wxPython and automatic scolling
-                if self.workaround_macos and not self.scroll_timer.IsRunning():
-                    self.scroll_timer.StartOnce(150)
+                #if self.workaround_macos:
+                #    sampleTime = 1
+                #    break
             except queue.Empty:
                 break
+        # we are in the event handler and thus in the GUI thread context, so we are allowed to append the text directly to `output_text`
+        text = ''.join(lines)
+        self.output_text.AppendText(text)
+        if self.last_output_time is not None:
+            time_diff = (current_time - self.last_output_time) * 1000
+            self.output_text.AppendText(f"\noutput call delta: {time_diff:.2f} ms\n")
+        self.last_output_time = current_time
+        if self.workaround_macos:
+            wx.CallAfter(self.scroll_to_bottom)
+
+        # we need a workaround for the problems of wxPython and automatic scolling on a huge number of output and scroll events,
+        # most notably on MacOS but also on Windows, this becomes a problem in the GUI event handling
+        if lines and not self.scroll_timer.IsRunning(): # if we had output, we sample for more output in a short time
+            self.scroll_timer.StartOnce(sampleTime)
+            #wx.YieldIfNeeded()
 
     def on_scroll_timer(self, event):
-        wx.CallAfter(self.scroll_to_bottom)
-        wx.CallLater(10, self.scroll_to_bottom) # scroll twice, on MacOS this makes scrolling more reliable and smoother
+        wx.CallAfter(self.on_text_output_event, None)
+#        wx.CallAfter(self.scroll_to_bottom)
+#        wx.CallLater(10, self.scroll_to_bottom) # scroll twice, on MacOS this makes scrolling more reliable and smoother
 
     def scroll_to_bottom(self):
         self.output_text.ShowPosition(self.output_text.GetLastPosition())
@@ -659,8 +683,8 @@ class ArduinoUploadDialog(wx.Dialog):
             self.active_build_option = builder.BuildCacheOption.CLEAN_ALL
 
         # create a closure to encapsulate self, later this sends the text on behalf of the thread
-        def send_text(output):
-            self.send_output_text(output)
+        def send_text(output, drainOutput = False):
+            self.send_output_text(output, drainOutput)
 
         # empty the text output for the new build run
         wx.CallAfter(self.output_text.Clear)
