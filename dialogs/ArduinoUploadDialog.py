@@ -8,7 +8,7 @@ from arduino import builder
 import util.paths as paths
 
 import wx
-import wx.xrc
+import wx.stc as stc
 
 import time
 import os
@@ -152,26 +152,54 @@ class ArduinoUploadDialog(wx.Dialog):
         self.m_staticText3.Wrap(-1)
         bSizer21.Add(self.m_staticText3, 0, wx.ALL, 5)
 
-        self.output_text = wx.TextCtrl(self.m_panel5, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.Size(800,400), wx.TE_MULTILINE|wx.TE_READONLY|wx.TE_CHARWRAP|wx.VSCROLL)
-        self.output_text.SetFont(wx.Font(10, 75, 90, 90, False, "Consolas"))
-        self.output_text.SetBackgroundColour(wx.BLACK)
-        self.output_text.SetForegroundColour(wx.WHITE)
-        self.output_text.SetDefaultStyle(wx.TextAttr(wx.WHITE))
+        # build output widget
+        self.output_text = stc.StyledTextCtrl(self.m_panel5, wx.ID_ANY, style=wx.BORDER_NONE)
+        self.output_text.SetMinSize(wx.Size(-1, 400))
+
+        # Set wrapping mode
+        self.output_text.SetWrapMode(stc.STC_WRAP_CHAR)
+        self.output_text.SetUseHorizontalScrollBar(False)
+        self.output_text.SetWrapStartIndent(0)
+        self.output_text.SetWrapVisualFlags(stc.STC_WRAPVISUALFLAG_END)
+
+        # terminal like style
+        self.output_text.StyleSetBackground(stc.STC_STYLE_DEFAULT, wx.BLACK)
+        self.output_text.StyleSetForeground(stc.STC_STYLE_DEFAULT, wx.WHITE)
+        self.output_text.SetCaretForeground(wx.WHITE)
+
+        # monospaced font
+        font = wx.Font(10, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        self.output_text.StyleSetFont(stc.STC_STYLE_DEFAULT, font)
+        self.output_text.StyleClearAll()
+
+        # disable unused borders/margins
+        self.output_text.SetMarginWidth(0, 0)
+        self.output_text.SetMarginWidth(1, 0)
+        self.output_text.SetMarginWidth(2, 0)
+
+        # set read-only
+        self.output_text.SetReadOnly(True)
 
         bSizer21.Add(self.output_text, 0, wx.ALL|wx.EXPAND, 5)
 
-        # define an application specific event for alerting the GUI thread of new output
-        self.text_output_event = wx.NewEventType()
-        self.text_output_event_binder = wx.PyEventBinder(self.text_output_event, 1)
-        self.Bind(self.text_output_event_binder, self.on_text_output_event)
+        self.output_text.SetReadOnly(False)
+        self.output_text.SetText("Initial text in the output widget.\n")
+        self.output_text.AppendText("Output widget initialized.\n")
+        self.output_text.SetReadOnly(True)
+        self.send_output_text("Text output test.\n")
+
+#        # define an application specific event for alerting the GUI thread of new output
+#        self.text_output_event = wx.NewEventType()
+#        self.text_output_event_binder = wx.PyEventBinder(self.text_output_event, 1)
+#        self.Bind(self.text_output_event_binder, self.on_text_output_event)
 
         # define the text communication queue
         self.text_queue = queue.Queue()
         self.last_output_time = None
 
-        # timer for the MacOS scrolling issue workaround
-        self.scroll_timer = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self.on_scroll_timer, self.scroll_timer)
+#        # timer for the MacOS scrolling issue workaround
+#        self.scroll_timer = wx.Timer(self)
+#        self.Bind(wx.EVT_TIMER, self.on_scroll_timer, self.scroll_timer)
 
         self.upload_button = wx.Button(self.m_panel5, wx.ID_ANY, _('Transfer to PLC'), wx.DefaultPosition, wx.DefaultSize, 0)
         self.upload_button.SetMinSize(wx.Size(150,30))
@@ -587,54 +615,16 @@ class ArduinoUploadDialog(wx.Dialog):
         self.aout_txt.SetValue(str(board_aout))
 
     def send_output_text(self, output, drainOutput = False):
-        self.text_queue.put(output)
-        if not self.scroll_timer.IsRunning():
-            wx.PostEvent(self, wx.PyEvent(eventType=self.text_output_event))
+        wx.CallAfter(self.append_text, output)
         if drainOutput:
-            while not self.text_queue.empty():
-                wx.YieldIfNeeded()
-                time.sleep(0.1)
+            wx.YieldIfNeeded()
 
-    def on_text_output_event(self, event):
-        lines = []
-        sampleTime = 400
-        current_time = time.time()
-        while not self.text_queue.empty():
-            try:
-                line = self.text_queue.get_nowait()
-                if line is None:
-                    # end of data
-                    break
-                lines.append(line)
-                self.text_queue.task_done()
-                #if self.workaround_macos:
-                #    sampleTime = 1
-                #    break
-            except queue.Empty:
-                break
-        # we are in the event handler and thus in the GUI thread context, so we are allowed to append the text directly to `output_text`
-        text = ''.join(lines)
+    def append_text(self, text):
+        self.output_text.SetReadOnly(False)
         self.output_text.AppendText(text)
-        if self.last_output_time is not None:
-            time_diff = (current_time - self.last_output_time) * 1000
-            self.output_text.AppendText(f"\noutput call delta: {time_diff:.2f} ms\n")
-        self.last_output_time = current_time
-        if self.workaround_macos:
-            wx.CallAfter(self.scroll_to_bottom)
-
-        # we need a workaround for the problems of wxPython and automatic scolling on a huge number of output and scroll events,
-        # most notably on MacOS but also on Windows, this becomes a problem in the GUI event handling
-        if lines and not self.scroll_timer.IsRunning(): # if we had output, we sample for more output in a short time
-            self.scroll_timer.StartOnce(sampleTime)
-            #wx.YieldIfNeeded()
-
-    def on_scroll_timer(self, event):
-        wx.CallAfter(self.on_text_output_event, None)
-#        wx.CallAfter(self.scroll_to_bottom)
-#        wx.CallLater(10, self.scroll_to_bottom) # scroll twice, on MacOS this makes scrolling more reliable and smoother
-
-    def scroll_to_bottom(self):
-        self.output_text.ShowPosition(self.output_text.GetLastPosition())
+        self.output_text.ScrollToEnd()
+        wx.CallLater(10, self.output_text.ScrollToEnd)
+        self.output_text.SetReadOnly(True)
 
     def restoreIODefaults(self, event):
         board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
