@@ -182,24 +182,8 @@ class ArduinoUploadDialog(wx.Dialog):
 
         bSizer21.Add(self.output_text, 0, wx.ALL|wx.EXPAND, 5)
 
-        self.output_text.SetReadOnly(False)
-        self.output_text.SetText("Initial text in the output widget.\n")
-        self.output_text.AppendText("Output widget initialized.\n")
-        self.output_text.SetReadOnly(True)
-        self.send_output_text("Text output test.\n")
-
-#        # define an application specific event for alerting the GUI thread of new output
-#        self.text_output_event = wx.NewEventType()
-#        self.text_output_event_binder = wx.PyEventBinder(self.text_output_event, 1)
-#        self.Bind(self.text_output_event_binder, self.on_text_output_event)
-
         # define the text communication queue
         self.text_queue = queue.Queue()
-        self.last_output_time = None
-
-#        # timer for the MacOS scrolling issue workaround
-#        self.scroll_timer = wx.Timer(self)
-#        self.Bind(wx.EVT_TIMER, self.on_scroll_timer, self.scroll_timer)
 
         self.upload_button = wx.Button(self.m_panel5, wx.ID_ANY, _('Transfer to PLC'), wx.DefaultPosition, wx.DefaultSize, 0)
         self.upload_button.SetMinSize(wx.Size(150,30))
@@ -614,17 +598,30 @@ class ArduinoUploadDialog(wx.Dialog):
         self.dout_txt.SetValue(str(board_dout))
         self.aout_txt.SetValue(str(board_aout))
 
-    def send_output_text(self, output, drainOutput = False):
-        wx.CallAfter(self.append_text, output)
-        if drainOutput:
-            wx.YieldIfNeeded()
+    def send_output_text(self, output):
+        self.text_queue.put(output) # queue the text output seperately and thread-safe, as CallAfter() does not preserve the call order
+        wx.CallAfter(self.append_text)
 
-    def append_text(self, text):
+    def append_text(self):
+        wx.YieldIfNeeded()
+
+        # Append the new text
         self.output_text.SetReadOnly(False)
-        self.output_text.AppendText(text)
+        while not self.text_queue.empty():
+            try:
+                line = self.text_queue.get_nowait()
+                if line is None:
+                    # end of data
+                    break
+                # we are in the GUI thread context, so we are allowed to append the text directly to `output_text`
+                self.output_text.AppendText(line)
+                self.text_queue.task_done()
+            except queue.Empty:
+                break
+        self.output_text.SetReadOnly(True)
+
         self.output_text.ScrollToEnd()
         wx.CallLater(10, self.output_text.ScrollToEnd)
-        self.output_text.SetReadOnly(True)
 
     def restoreIODefaults(self, event):
         board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
@@ -673,11 +670,16 @@ class ArduinoUploadDialog(wx.Dialog):
             self.active_build_option = builder.BuildCacheOption.CLEAN_ALL
 
         # create a closure to encapsulate self, later this sends the text on behalf of the thread
-        def send_text(output, drainOutput = False):
-            self.send_output_text(output, drainOutput)
+        def send_text(output):
+            self.send_output_text(output)
 
         # empty the text output for the new build run
-        wx.CallAfter(self.output_text.Clear)
+        def outputTextClearAll():
+            self.output_text.SetReadOnly(False)
+            self.output_text.ClearAll()
+            self.output_text.SetReadOnly(True)
+
+        wx.CallAfter(outputTextClearAll)
         wx.YieldIfNeeded()
 
         # now create the build thread

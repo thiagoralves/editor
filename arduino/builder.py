@@ -673,8 +673,7 @@ void updateTime()
             append_compiler_log(send_text, '\n' + _('COMPILATION DONE!'))
 
     time.sleep(1)  # make sure files are not in use anymore
-    send_text('\n', True)
-    
+
     # no clean up
     return
 
