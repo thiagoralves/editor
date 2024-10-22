@@ -118,6 +118,13 @@ void mbconfig_serial_iface(Stream* port, long baud, int txPin)
     #if defined(CONTROLLINO_MAXI) || defined(CONTROLLINO_MEGA)
         if (mb_serialport == &Serial3) 
             Controllino_RS485Init();
+    #elif defined(CONTROLLINO_MICRO)
+    if (mb_serialport == &Serial2) {
+        pinMode(CUSTOM_RS485_DEFAULT_DE_PIN, OUTPUT);
+        pinMode(CUSTOM_RS485_DEFAULT_RE_PIN, OUTPUT);
+        digitalWrite(CUSTOM_RS485_DEFAULT_DE_PIN, LOW);
+        digitalWrite(CUSTOM_RS485_DEFAULT_RE_PIN, HIGH);
+    }
     #endif
 
     // Modbus states that a baud rate higher than 19200 must use a fixed 750 us
@@ -427,6 +434,11 @@ void handle_serial()
     #if defined(CONTROLLINO_MAXI) || defined(CONTROLLINO_MEGA)
         if (mb_serialport == &Serial3) // RS485 serial port
             Controllino_RS485TxEnable(); // Enable RS485 chip to transmit 
+    #elif defined(CONTROLLINO_MICRO)
+        if (mb_serialport == &Serial2) {
+            digitalWrite(CUSTOM_RS485_DEFAULT_DE_PIN, HIGH);
+            digitalWrite(CUSTOM_RS485_DEFAULT_RE_PIN, HIGH);
+        }
     #endif
 
     (*mb_serialport).write(mb_frame, mb_frame_len);
@@ -439,6 +451,11 @@ void handle_serial()
     #if defined(CONTROLLINO_MAXI) || defined(CONTROLLINO_MEGA)
         if (mb_serialport == &Serial3) // RS485 serial port
             Controllino_RS485RxEnable(); // Go back to receive mode after transmitted data
+    #elif defined(CONTROLLINO_MICRO)
+        if (mb_serialport == &Serial2) {
+            digitalWrite(CUSTOM_RS485_DEFAULT_DE_PIN, LOW);
+            digitalWrite(CUSTOM_RS485_DEFAULT_RE_PIN, LOW);
+        }
     #endif
 }
 #endif
