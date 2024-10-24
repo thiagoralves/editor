@@ -272,6 +272,17 @@
     "source": "controllino_mini.cpp",
     "version": "0"
   },
+  "CONTROLLINO MICRO": {
+    "core": "controllino_rp2:rp2040",
+    "default_ain": "50, 51, 52, 53, 54, 55",
+    "default_aout": "23, 24",
+    "default_din": "26, 27, 28, 29",
+    "default_dout": "13, 14, 15, 20, 21, 22",
+    "last_update": 0,
+    "platform": "controllino_rp2:rp2040:controllino_micro",
+    "source": "controllino_micro.cpp",
+    "version": "0"
+  },
   "ESP32-C3": {
     "core": "esp32:esp32",
     "default_ain": "34, 35, 36, 39",
