@@ -1,3 +1,4 @@
+import copy
 import re
 import datetime
 import threading
@@ -951,12 +952,9 @@ class ArduinoUploadDialog(wx.Dialog):
 
     def loadSettings(self):
         """Load settings and update GUI"""
-        self.settings = self.project_controller.GetArduinoSettings() or self.default_settings.copy()
-        
+        self.settings = self.project_controller.GetArduinoSettings()
         # Fill missing values from defaults
-        for key in self.default_settings:
-            if key not in self.settings:
-                self.settings[key] = self.default_settings[key]
+        self.settings.update({k:copy.deepcopy(v) for k,v in self.default_settings.items() if k not in self.settings})
         
         # normalize the board type entry from earlier editor versions
         self.settings['board_type'] = self.settings.get('board_type').split(" [")[0]

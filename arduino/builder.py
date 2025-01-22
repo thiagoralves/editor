@@ -564,7 +564,8 @@ def upgrade_core(send_text, core_name: str, status = None) -> Tuple[bool, str]:
             cmd = _cli_command + ['--json', 'core', 'list', '--updatable']
             result = runCommand(cmd)
             updates_data = json.loads(result)
-            updatable_platforms = get_platform_list(updates_data)
+            # Extract and validate platforms array, defaulting to empty list if not found
+            updatable_platforms = updates_data.get('platforms', [])
             
             core_needs_update = any(
                 platform.get('id') == core_name 
@@ -641,7 +642,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
     arduino_platform = board_hal['platform']
     source_file = board_hal['source']
     required_libs = OPLC_DEPS   # in the future this might take project libraries, board specific libraries and extension specific libraries too
-
+    
     def setup_environment() -> bool:
         # Clear build log
         open(os.path.join(_arduino_src_path, 'build.log'), 'w').close()
