@@ -30,10 +30,10 @@ class ArduinoUploadDialog(wx.Dialog):
     BUILD_OPTIONS = [
             (_("Use build cache"), builder.BuildCacheOption.USE_CACHE),
             (_("Clean build cache"), builder.BuildCacheOption.CLEAN_BUILD),
-            (_("Clean build cache, upgrade core"), builder.BuildCacheOption.UPGRADE_CORE),
-            (_("Clean build cache, upgrade libraries"), builder.BuildCacheOption.UPGRADE_LIBS),
-            (_("Clean build cache, reinstall libraries"), builder.BuildCacheOption.CLEAN_LIBS),
-            (_("Mr. Proper (Clean, reinstall core, board and libraries)"), builder.BuildCacheOption.MR_PROPER)
+            (_("Clean build cache, upgrade core (uses internet connection)"), builder.BuildCacheOption.UPGRADE_CORE),
+            (_("Clean build cache, upgrade libraries (uses internet connection)"), builder.BuildCacheOption.UPGRADE_LIBS),
+            (_("Clean build cache, reinstall libraries (uses internet connection)"), builder.BuildCacheOption.CLEAN_LIBS),
+            (_("Mr. Proper (Clean, reinstall core, board and libraries, uses internet connection)"), builder.BuildCacheOption.MR_PROPER)
         ]
 
 
@@ -67,18 +67,7 @@ class ArduinoUploadDialog(wx.Dialog):
         wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = _('Transfer Program to PLC'), pos = wx.DefaultPosition, style = wx.DEFAULT_DIALOG_STYLE )
 
         # load Hals automatically and initialize the board_type_comboChoices
-        self.loadHals()
-        self.updateInstalledBoards()
-        board_type_comboChoices = []
-        for board in self.hals:
-            board_name = ""
-            if self.hals[board]['version'] == "0":
-                board_name = board + ' [' + _('NOT INSTALLED') + ']'
-            else:
-                board_name = board + ' [' + self.hals[board]['version'] + ']'
-
-            board_type_comboChoices.append(board_name)
-        board_type_comboChoices.sort()
+        self.board_type_comboChoices = []
 
         self.SetSizeHints(wx.Size(-1,-1), wx.DefaultSize)
 
@@ -96,8 +85,11 @@ class ArduinoUploadDialog(wx.Dialog):
         self.m_staticText1.Wrap(-1)
         top_sizer.Add(self.m_staticText1, pos=(0,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
 
-        self.board_type_combo = wx.ComboBox(top_panel, wx.ID_ANY, "Arduino Uno", wx.DefaultPosition, wx.Size(-1,-1), board_type_comboChoices, wx.CB_READONLY)
+        self.board_type_combo = wx.ComboBox(top_panel, wx.ID_ANY, "Arduino Uno", wx.DefaultPosition, wx.Size(-1,-1), self.board_type_comboChoices, wx.CB_READONLY)
         top_sizer.Add(self.board_type_combo, pos=(0,1), flag=wx.ALL | wx.EXPAND, border=0)
+
+        self.loadHals()
+        self.updateInstalledBoards()
 
         self.m_staticline1 = wx.StaticLine(top_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
         top_sizer.Add(self.m_staticline1, pos=(1,0), span=(1,3), flag=wx.EXPAND, border=5)
@@ -814,17 +806,10 @@ class ArduinoUploadDialog(wx.Dialog):
         compiler_thread.start()
         compiler_thread.join()
         
-        values_changed = (
-            old_values['last_update'] != board_hal.get('last_update', None) or 
-            old_values['version'] != board_hal.get('version', None)
-        )
-        
-        if values_changed:
-            self.saveHals()
-
-        self.saveSettings()
+        # self.saveSettings()
         self.updateInstalledBoards()
-        self.loadSettings() # Get the correct board name if an update or install occurred
+        self.loadSettings()
+        self._applySettingsToGui()
 
         # reset the build cache option and enable the UI
         wx.CallAfter(self.set_build_option, builder.BuildCacheOption.USE_CACHE)
@@ -1036,7 +1021,7 @@ class ArduinoUploadDialog(wx.Dialog):
             return
         
         if caller:
-            # print("Marking ArduinoSettings for save on behalf of", caller)
+            print("Marking ArduinoSettings for save on behalf of", caller)
             pass
         
         self.project_controller.SetArduinoSettingsChanged()
@@ -1080,3 +1065,16 @@ class ArduinoUploadDialog(wx.Dialog):
             self.hals[board]['version'] = version
 
         self.saveHals()
+        
+        self.board_type_comboChoices.clear()
+        for board in self.hals:
+            board_name = ""
+            if self.hals[board]['version'] == "0":
+                board_name = board + ' [' + _('NOT INSTALLED') + ']'
+            else:
+                board_name = board + ' [' + self.hals[board]['version'] + ']'
+
+            self.board_type_comboChoices.append(board_name)
+        self.board_type_comboChoices.sort()
+        self.board_type_combo.Clear()
+        self.board_type_combo.Set(self.board_type_comboChoices)

@@ -309,6 +309,10 @@ def check_libraries_status() -> Tuple[int, str]:
         2 - Error checking libraries
     """
     try:
+        # Update library index
+        cmd = _cli_command + ['lib', 'update-index']
+        runCommand(cmd)
+        
         # Check for available updates using JSON format
         cmd = _cli_command + ['--json', 'lib', 'list', '--updatable']
         json_output = runCommand(cmd)
@@ -381,10 +385,6 @@ def upgrade_libraries(send_text) -> Tuple[bool, str]:
         Tuple[bool, str]: (Success, Description)
     """
     try:
-        # Update library index
-        cmd = _cli_command + ['lib', 'update-index']
-        runCommandToWin(send_text, cmd)
-        
         # Check for updates
         status, message = check_libraries_status()
         if status == 0:  # All up to date
@@ -675,7 +675,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
     def handle_board_installation() -> bool:
         append_compiler_log(send_text, 'Checking Core and Board installation...\n')
         core = board_hal['core']
-        core_status, message = check_core_status(core, (build_option > BuildCacheOption.USE_CACHE))
+        core_status, message = check_core_status(core, (build_option > BuildCacheOption.CLEAN_BUILD))
         append_compiler_log(send_text, f'{message}\n')
         
         board_manager_url = board_hal.get('board_manager_url', None)
@@ -712,7 +712,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
             board_hal['version'] = get_core_version(core)
             
         # Handle core updates based on build option
-        elif core_status > 1 or build_option >= BuildCacheOption.UPGRADE_CORE:
+        elif core_status > 1 or build_option == BuildCacheOption.UPGRADE_CORE:
             success, message = upgrade_core(send_text, core, core_status)
             if not success:
                 append_compiler_log(send_text, f'\n{message}\n')
@@ -783,7 +783,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         return True
 
     def update_libraries() -> bool:
-        if build_option > BuildCacheOption.USE_CACHE:
+        if build_option > BuildCacheOption.CLEAN_BUILD:
             append_compiler_log(send_text, _('Checking Libraries status...') + '\n')
             libraries_status, message = check_libraries_status()
             append_compiler_log(send_text, f'{message}\n')
