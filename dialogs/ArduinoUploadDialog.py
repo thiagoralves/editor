@@ -135,7 +135,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         # Create compile only checkbox
         self.check_compile = wx.CheckBox(self.m_panel5, wx.ID_ANY, _('Compile Only'), wx.DefaultPosition, wx.DefaultSize, 0)
-        self.check_compile.Bind(wx.EVT_CHECKBOX, self.onUIChange)
+        self.check_compile.Bind(wx.EVT_CHECKBOX, self.onCompileChange)
         # Add to horizontal sizer, aligned left
         gbs.Add(self.check_compile, pos=(1,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL, border=5)
 
@@ -624,6 +624,17 @@ class ArduinoUploadDialog(wx.Dialog):
         self.markSettingsForSave("updateModbusSettings")
         self.onUIChange(None)  # Update GUI states
 
+    def onCompileChange(self, e):
+        # Update Compile controls
+        if (self.check_compile.GetValue() == False):
+            self.com_port_combo.Enable(True)
+            self.reload_button.Enable(True)
+            self.upload_button.SetLabel(_('Transfer to PLC'))
+        else:
+            self.com_port_combo.Enable(False)
+            self.reload_button.Enable(False)
+            self.upload_button.SetLabel(_('Compile'))
+
     def onUIChange(self, e):
         """Update UI states based on current settings"""
         # Update Modbus Serial controls
@@ -637,16 +648,6 @@ class ArduinoUploadDialog(wx.Dialog):
             self.baud_rate_combo.Enable(True)
             self.slaveid_txt.Enable(True)
             self.txpin_txt.Enable(True)
-
-        # Update Compile controls
-        if (self.check_compile.GetValue() == False):
-            self.com_port_combo.Enable(True)
-            self.reload_button.Enable(True)
-            self.upload_button.SetLabel(_('Transfer to PLC'))
-        else:
-            self.com_port_combo.Enable(False)
-            self.reload_button.Enable(False)
-            self.upload_button.SetLabel(_('Compile'))
 
         if (self.check_modbus_tcp.GetValue() == False):
             self.tcp_iface_combo.Enable(False)
@@ -809,7 +810,7 @@ class ArduinoUploadDialog(wx.Dialog):
         # self.saveSettings()
         self.updateInstalledBoards()
         self.loadSettings()
-        self._applySettingsToGui()
+        wx.CallAfter(self._applySettingsToGui)
 
         # reset the build cache option and enable the UI
         wx.CallAfter(self.set_build_option, builder.BuildCacheOption.USE_CACHE)
@@ -820,7 +821,7 @@ class ArduinoUploadDialog(wx.Dialog):
         self.check_compile.Enable(enabled)
         if (not enabled or self.check_compile.GetValue() == False):
             self.com_port_combo.Enable(enabled)
-        self.reload_button.Enable(enabled)
+            self.reload_button.Enable(enabled)
         self.upload_button.Enable(enabled)
         self.build_options.Enable(enabled)
 
@@ -975,6 +976,8 @@ class ArduinoUploadDialog(wx.Dialog):
 
     def _applySettingsToGui(self):
         """Update all GUI elements from self.settings"""
+        oldSettingsUpdateFlag = self.settingsInternalUpdate
+        self.settingsInternalUpdate = True
         # Get the correct name for the board_type
         board = self.settings['board_type'].split(' [')[0]
         board_name = ""
@@ -984,7 +987,9 @@ class ArduinoUploadDialog(wx.Dialog):
             else:
                 board_name = board + ' [' + self.hals[board]['version'] + ']'
     
-        # Set board and COM port
+        # Set board
+        self.board_type_combo.Clear()
+        self.board_type_combo.Set(self.board_type_comboChoices)
         self.board_type_combo.SetValue(board_name)
         
         # Update COM port display
@@ -1015,13 +1020,14 @@ class ArduinoUploadDialog(wx.Dialog):
     
         # Update IO fields and handle enable/disable states
         self.onUIChange(None)
+        self.settingsInternalUpdate = oldSettingsUpdateFlag
 
     def markSettingsForSave(self, caller: str = None):
         if self.settingsInternalUpdate:
             return
         
         if caller:
-            print("Marking ArduinoSettings for save on behalf of", caller)
+            # print("Marking ArduinoSettings for save on behalf of", caller)
             pass
         
         self.project_controller.SetArduinoSettingsChanged()
@@ -1076,5 +1082,3 @@ class ArduinoUploadDialog(wx.Dialog):
 
             self.board_type_comboChoices.append(board_name)
         self.board_type_comboChoices.sort()
-        self.board_type_combo.Clear()
-        self.board_type_combo.Set(self.board_type_comboChoices)
