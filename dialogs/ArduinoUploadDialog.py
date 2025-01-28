@@ -904,6 +904,39 @@ class ArduinoUploadDialog(wx.Dialog):
         if any(stm_func in self.plc_program for stm_func in ['STM32CAN_CONF;', 'STM32CAN_WRITE;', 'STM32CAN_READ;']):
             self.definitions.append('#define USE_STM32CAN_BLOCK')
 
+    def resolveBoardTypeAlias(self, alias_name):
+        """
+        Resolve a board type alias to its actual name.
+        
+        Args:
+            alias_name (str): The alias name to resolve
+            
+        Returns:
+            str: The actual board type name if found, otherwise None
+        """
+        # First check if the alias is a direct board type
+        if alias_name in self.hals:
+            return alias_name
+            
+        # Search through all board types and their aliases
+        for board_type, board_info in self.hals.items():
+            # Check if board has aliases entry
+            if 'aliases' not in board_info:
+                continue
+                
+            # Handle the case where aliases is a string
+            if isinstance(board_info['aliases'], str):
+                if board_info['aliases'] == alias_name:
+                    return board_type
+                continue
+                
+            # Handle the case where aliases is a list
+            if isinstance(board_info['aliases'], list):
+                if alias_name in board_info['aliases']:
+                    return board_type
+                    
+        # No match found
+        return None
 
     def saveSettings(self, event=None):
         self.settings['board_type'] = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
@@ -935,7 +968,7 @@ class ArduinoUploadDialog(wx.Dialog):
         self.settings.pop('last_update', None)
 
         self.markSettingsForSave("saveSettings")
-
+    
     def loadSettings(self):
         """Load settings and update GUI"""
         self.settings = self.project_controller.GetArduinoSettings()
@@ -943,7 +976,20 @@ class ArduinoUploadDialog(wx.Dialog):
         self.settings.update({k:copy.deepcopy(v) for k,v in self.default_settings.items() if k not in self.settings})
         
         # normalize the board type entry from earlier editor versions
-        self.settings['board_type'] = self.settings.get('board_type').split(" [")[0]
+        normalized_board_type = self.settings.get('board_type').split(" [")[0]
+        
+        # Try to resolve the board type if it's not directly in self.hals
+        if normalized_board_type not in self.hals:
+            resolved_board_type = self.resolveBoardTypeAlias(normalized_board_type)
+            if resolved_board_type is not None:
+                normalized_board_type = resolved_board_type
+                oldUpdateFlag = self.settingsInternalUpdate
+                self.settingsInternalUpdate = False
+                self.markSettingsForSave("loadSettings")    # we had to translate a renamed board type, mark the project data for save
+                self.settingsInternalUpdate = oldUpdateFlag
+                wx.MessageDialog(self, _('Board type "{oldType}"\nwas updated to "{newType}",\ne.g. due to renaming of the old type.').format(oldType=self.settings.get('board_type'), newType=normalized_board_type), _('Board Type Update'), wx.OK | wx.ICON_INFORMATION).ShowModal()
+        
+        self.settings['board_type'] = normalized_board_type
         
         # Check if any IO setting is missing and restore defaults if needed
         if not all(key in self.settings for key in ['user_din', 'user_ain', 'user_dout', 'user_aout']):
@@ -1024,6 +1070,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
     def markSettingsForSave(self, caller: str = None):
         if self.settingsInternalUpdate:
+            # print("'markSettingsForSave()' ignored, caller:", caller)
             return
         
         if caller:

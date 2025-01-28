@@ -17,6 +17,7 @@ cp hals.json hals.json.bak
 jq '
 . + {
   "New Board Template": {
+    "aliases": [],
     "core": "vendor:architecture",
     "default_ain": "A0, A1, A2, A3",
     "default_aout": "DAC0, DAC1",
