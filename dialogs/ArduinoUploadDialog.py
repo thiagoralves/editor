@@ -12,11 +12,10 @@ import wx
 import wx.stc as stc
 
 import time
+import zipfile
 import os
 import platform
 import json
-import time
-import glob
 
 # -------------------------------------------------------------------------------
 #                            Arduino Upload Dialog
@@ -24,6 +23,7 @@ import glob
 
 hals_file = os.path.abspath('editor/arduino/examples/Baremetal/hals.json')
 default_settings_file = os.path.abspath('editor/arduino/examples/Baremetal/settingsDefaults.json')
+build_log_archive_filename = 'arduino-saved-build-logs.zip'
 
 class ArduinoUploadDialog(wx.Dialog):
     """Dialog to configure upload parameters"""
@@ -199,11 +199,28 @@ class ArduinoUploadDialog(wx.Dialog):
         # define the text communication queue
         self.text_queue = queue.Queue()
 
+        # Create a GridBagSizer for the Transfer/Compile/SaveLogs buttons
+        gbs2 = wx.GridBagSizer(vgap=5, hgap=5)
+        
         self.upload_button = wx.Button(self.m_panel5, wx.ID_ANY, _('Transfer to PLC'), wx.DefaultPosition, wx.DefaultSize, 0)
         self.upload_button.SetMinSize(wx.Size(150,30))
         self.upload_button.Bind(wx.EVT_BUTTON, self.OnUpload)
 
-        bSizer21.Add(self.upload_button, 0, wx.ALIGN_CENTER|wx.ALL, 5)
+        self.buildlog_button = wx.Button(self.m_panel5, wx.ID_ANY, _('Save build log to project'), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.buildlog_button.SetToolTip(_('Save the most recent build output log to the ZIP file \'{build_log_archive_filename}\' in the current project.\nAdds the build start time stamp to the file name inside the ZIP file.\nWorks also for old builds and without build output in the window.\nDoes not check, if the saved build.log matches the current project.').format(build_log_archive_filename=build_log_archive_filename))
+        self.buildlog_button.SetMinSize(wx.Size(200,30))
+        self.buildlog_button.Bind(wx.EVT_BUTTON, self.SaveBuildLog)
+
+        gbs2.Add(self.upload_button, pos=(0,1), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
+        gbs2.Add(self.buildlog_button, pos=(0,3), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
+        # Make the left and the middle column growable
+        gbs2.AddGrowableCol(0)
+        gbs2.AddGrowableCol(2)
+        
+        if not os.path.exists(f'{builder._arduino_src_path}/build.log'):
+            self.buildlog_button.Enable(False)
+        
+        bSizer21.Add(gbs2, 0, wx.EXPAND | wx.ALL, 5)
 
         self.m_panel5.SetSizer(bSizer21)
         self.m_panel5.Layout()
@@ -823,13 +840,33 @@ class ArduinoUploadDialog(wx.Dialog):
         if (not enabled or self.check_compile.GetValue() == False):
             self.com_port_combo.Enable(enabled)
             self.reload_button.Enable(enabled)
+            
         self.upload_button.Enable(enabled)
+        
+        if not os.path.exists(f'{builder._arduino_src_path}/build.log'):
+            self.buildlog_button.Enable(False)
+        else:
+            self.buildlog_button.Enable(enabled)
+        
         self.build_options.Enable(enabled)
 
     def OnUpload(self, event):
         self.setUIState(False)
         builder_thread = threading.Thread(target=self.startBuilder)
         builder_thread.start()
+
+    def SaveBuildLog(self, event):
+        self.setUIState(False)
+        log_file = os.path.join(builder._arduino_src_path, 'build.log')
+        if os.path.exists(log_file):
+            zip_filename = os.path.join(self.project_controller.ProjectPath, build_log_archive_filename)
+            stamped_log_filename = get_timestamped_logfilename(log_file)
+            if stamped_log_filename:
+                with zipfile.ZipFile(zip_filename, 'a', zipfile.ZIP_DEFLATED) as zipf:
+                    if stamped_log_filename not in zipf.namelist():
+                        zipf.write(log_file, stamped_log_filename)
+            cleanup_zip_file(zip_filename)
+        self.setUIState(True)
 
     def generateDefinitions(self):
         """Generate definitions and store them in the object"""
@@ -1130,3 +1167,86 @@ class ArduinoUploadDialog(wx.Dialog):
 
             self.board_type_comboChoices.append(board_name)
         self.board_type_comboChoices.sort()
+
+def get_timestamped_logfilename(input_filename: str) -> str:
+    """
+    Process the build log file and create a new filename with embedded timestamp.
+    Handles full paths while returning only the filename for the new name.
+    
+    Args:
+        input_filename: Name of the input file (default: "build.log")
+        
+    Returns:
+        str: new filename without path, containing the extracted timestamp
+        None: if any error occurs during processing
+    """
+    try:
+        with open(input_filename, 'r', encoding='utf-8') as file:
+            first_line = file.readline().strip()
+            
+        if not first_line:
+            return None
+            
+        # Extract timestamp using regex
+        timestamp_pattern = r'\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d{3}\]'
+        match = re.search(timestamp_pattern, first_line)
+        
+        if not match:
+            return None
+            
+        # Replace colons with hyphens in timestamp
+        safe_timestamp = match.group(1).replace(':', '-')
+            
+        # Get just the filename without path, then split into base name and extension
+        base_filename = os.path.basename(input_filename)
+        base_name = os.path.splitext(base_filename)[0]  # "build"
+        extension = os.path.splitext(base_filename)[1]   # ".log"
+        
+        return f"{base_name}-{safe_timestamp}{extension}"
+        
+    except:  # Catch all possible errors
+        return None
+
+def cleanup_zip_file(zip_filename, max_files=50, max_age_days=60):
+    # Open the original ZIP
+    with zipfile.ZipFile(zip_filename, 'r') as zip_in:
+        # Get all files with their info
+        files = []
+        for info in zip_in.infolist():
+            # Convert DOS time to datetime
+            date = datetime.datetime(*info.date_time)
+            files.append((info, date))
+        
+        # Sort by date (oldest first)
+        files.sort(key=lambda x: x[1])
+        
+        # Determine cutoff date for max_age_days
+        cutoff_date = datetime.datetime.now() - datetime.timedelta(days=max_age_days)
+        
+        # Keep only files that:
+        # 1. Are not older than max_age_days AND
+        # 2. Are among the max_files newest files
+        files_to_keep = []
+        for file_info, date in files:
+            if date >= cutoff_date:
+                files_to_keep.append(file_info)
+        
+        # Keep only the newest max_files files
+        if len(files_to_keep) > max_files:
+            files_to_keep = files_to_keep[-max_files:]
+
+        # Check if changes are needed
+        if len(files_to_keep) == len(files):
+            # No files to delete
+            return
+            
+        # Create temporary ZIP file only if changes are needed
+        temp_zip = zip_filename + '.temp'
+        with zipfile.ZipFile(temp_zip, 'w', zipfile.ZIP_DEFLATED) as zip_out:
+            for info in files_to_keep:
+                # Copy file and its data
+                zip_out.writestr(info, zip_in.read(info.filename))
+
+    # Replace old ZIP file with the new one
+    os.replace(temp_zip, zip_filename)
+
