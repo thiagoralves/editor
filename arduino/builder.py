@@ -50,10 +50,14 @@ _iec_transpiler = ''
 class BuildCacheOption(Enum):
     USE_CACHE = auto()
     CLEAN_BUILD = auto()
+    INSTALL_DEPS = auto()
     UPGRADE_CORE = auto()
     UPGRADE_LIBS = auto()
     CLEAN_LIBS = auto()
     MR_PROPER = auto()
+
+    def __str__(self):
+        return self.name
 
     def __lt__(self, other):
         if self.__class__ is other.__class__:
@@ -96,7 +100,9 @@ def append_compiler_log(send_text, output):
     except IOError as e:
         print(f"Fehler beim Schreiben in die Logdatei: {e}")
 
-    send_text(output)
+    # Only send to UI if callback is provided
+    if send_text is not None:
+        send_text(output)
 
 def runCommand(command):
     """
@@ -258,7 +264,8 @@ def log_host_info(send_text):
             append_compiler_log(send_text, f"Error getting macOS CPU info: {e}\n")
 
     path_content = os.environ.get('PATH', '')
-    append_compiler_log(send_text, "\n" + _("active PATH Variable") + ":\n" + path_content + "\n\n")
+    append_compiler_log(send_text, "\n" + _("active PATH Variable") + ":\n" + path_content + "\n")
+    append_compiler_log(send_text, ("-" * 80) + "\n\n")
 
 def are_libraries_installed(lib_list: List[str]) -> List[str]:
     """
@@ -472,6 +479,7 @@ def check_core_status(core_name: str, updateCheck: bool = True) -> Tuple[int, st
         0 - Up to date or no action needed
         1 - Reinstallation recommended
         2 - First installation needed
+        3 - No board manager for core
     """
     if updateCheck:
         cmd = _cli_command + ['--json', 'core', 'update-index']
@@ -492,6 +500,19 @@ def check_core_status(core_name: str, updateCheck: bool = True) -> Tuple[int, st
             break
             
     if not core_found:
+        # Search if core is available in any board manager
+        cmd = _cli_command + ['--json', 'core', 'search', core_name]
+        search_result = runCommand(cmd)
+        search_data = json.loads(search_result)
+        
+        # Check if core exists in search results
+        core_available = any(
+            platform.get('id') == core_name 
+            for platform in search_data.get('platforms', [])
+        )
+        
+        if not core_available:
+            return (3, _("Core {core_name} is not available in any board manager").format(core_name=core_name))
         return (2, _("Core {core_name} is not installed").format(core_name=core_name))
     
     if not updateCheck:
@@ -597,6 +618,10 @@ def upgrade_core(send_text, core_name: str, status = None) -> Tuple[bool, str]:
             if result != 0:
                 return (False, _("Initial core installation failed."))
             return (True, _("Initial core installation successful."))
+
+        elif status == 3:
+            return (False, _('Core installation not possible, no board manager provides core "{core_name}".').format(core_name=core_name))
+
             
     except Exception as e:
         return (False, _("Error with {core_name}: {err_msg}").format(core_name=core_name, err_msg=str(e)))
@@ -633,6 +658,8 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
     
     Args:
         st_file: Content of the ST (Structured Text) file
+        definitions (list): List of definition strings
+        arduino_sketch (str): Arduino sketch content or None
         port: Serial port for upload (optional)
         send_text: Callback for user notifications
         board_hal: Board HAL configuration
@@ -646,7 +673,15 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
     def setup_environment() -> bool:
         # Clear build log
         open(os.path.join(_arduino_src_path, 'build.log'), 'w').close()
-        log_host_info(send_text)
+        
+        # Log build parameters to file only
+        append_compiler_log(None, "Build parameters:")
+        append_compiler_log(None, f"PORT: {port if port else 'None'}")
+        append_compiler_log(None, f"BOARD_HAL: {json.dumps(board_hal, indent=2)}")
+        append_compiler_log(None, f"BUILD_OPTION: {str(build_option)}")
+        append_compiler_log(None, "-" * 80)
+        
+        log_host_info(None)
         
         # Clean old files
         old_files = ['POUS.c', 'POUS.h', 'LOCATED_VARIABLES.h', 
@@ -682,9 +717,17 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         if board_manager_url:
             board_installed = is_board_url_configured(board_manager_url)
         else:
-            board_installed = re.match(r"arduino:.*", core) # usually all/only arduino cores do not need an additional board manager URL
-        
+            board_installed = core_status < 3
+
         if not board_installed or build_option >= BuildCacheOption.MR_PROPER:
+            if build_option < BuildCacheOption.INSTALL_DEPS:
+                append_compiler_log(send_text, '\n' + _('Board support files are not installed in this system. Select “Install dependencies...” on build options to install required files - this requires internet connection".') + '\n')
+                return False
+                
+            if core_status >= 3 and not board_manager_url:
+                append_compiler_log(send_text, '\n' + _('Core installation not possible, no board manager provides core "{core_name}".').format(core_name=core) + '\n')
+                return False
+            
             append_compiler_log(send_text, _("Cleaning download cache") + "...\n")
             if runCommandToWin(send_text, _cli_command + ['cache', 'clean']) != 0:
                 return False
@@ -701,6 +744,14 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
                 for cmd in cmds:
                     if runCommandToWin(send_text, _cli_command + cmd) != 0:
                         return False
+            
+                # Check, if this HAL board manager provides the core
+                core_status, message = check_core_status(core, False)
+                
+                if core_status >= 3:
+                    runCommandToWin(send_text, _cli_command + ['config', 'remove', 'board_manager.additional_urls', board_manager_url])
+                    append_compiler_log(send_text, '\n' + _('Core installation not possible, the HAL board manager did not provide core "{core_name}".').format(core_name=core) + '\n')
+                    return False
             
             # Install core
             success, message = reinstall_core(send_text, core)
@@ -744,6 +795,10 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         if not missing_libs:
             append_compiler_log(send_text, _("All required libraries are already installed.") + '\n')
             return True
+        
+        if build_option < BuildCacheOption.INSTALL_DEPS:
+            append_compiler_log(send_text, '\n' + _('OpenPLC support libraries are not installed in this system. Select “Install dependencies...” on build options to install required files - this requires internet connection".') + '\n')
+            return False
         
         # Update the library index before installation
         try:

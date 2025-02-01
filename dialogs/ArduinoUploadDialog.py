@@ -30,9 +30,10 @@ class ArduinoUploadDialog(wx.Dialog):
     BUILD_OPTIONS = [
             (_("Use build cache"), builder.BuildCacheOption.USE_CACHE),
             (_("Clean build cache"), builder.BuildCacheOption.CLEAN_BUILD),
-            (_("Clean build cache, upgrade core (uses internet connection)"), builder.BuildCacheOption.UPGRADE_CORE),
-            (_("Clean build cache, upgrade libraries (uses internet connection)"), builder.BuildCacheOption.UPGRADE_LIBS),
-            (_("Clean build cache, reinstall libraries (uses internet connection)"), builder.BuildCacheOption.CLEAN_LIBS),
+            (_("Install dependencies, check upgrades (uses internet connection)"), builder.BuildCacheOption.INSTALL_DEPS),
+            (_("Upgrade core (uses internet connection)"), builder.BuildCacheOption.UPGRADE_CORE),
+            (_("Upgrade libraries (uses internet connection)"), builder.BuildCacheOption.UPGRADE_LIBS),
+            (_("Reinstall libraries (uses internet connection)"), builder.BuildCacheOption.CLEAN_LIBS),
             (_("Mr. Proper (Clean, reinstall core, board and libraries, uses internet connection)"), builder.BuildCacheOption.MR_PROPER)
         ]
 
