@@ -201,6 +201,7 @@ def runCommandToWin(send_text, command, cwd=None, timeout=None):
         append_compiler_log(send_text, '$? = ' + str(return_code) + '\n')
 
     except subprocess.CalledProcessError as exc:
+        append_compiler_log(send_text, '\n' + _("Command execution failed.") + '\n')
         append_compiler_log(send_text, exc.output)
         return_code = exc.returncode if exc.returncode is not None else -3
 
@@ -1177,7 +1178,7 @@ void updateTime()
             return True
             
         # Upload to board
-        append_compiler_log(send_text, f'\n{_("Uploading program to Arduino board at {port}...")}\n')
+        append_compiler_log(send_text, '\n' + _("Uploading program to Arduino board at {port}...").format(port=port) + '\n')
         cmd = _cli_command + ['upload', '--port', port, '--fqbn', arduino_platform, 
                             _arduino_ino_base_path]
         if runCommandToWin(send_text, cmd) != 0:
@@ -1236,6 +1237,7 @@ void updateTime()
     
     for phase in build_phases:
         if not phase():
+            append_compiler_log(send_text, _("Build phase {phase} failed").format(phase=phase))
             return
             
 def setup_module():
