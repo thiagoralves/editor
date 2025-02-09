@@ -19,9 +19,8 @@ uint8_t pinMask_AOUT[] = {PINMASK_AOUT};
 #define PWM_RESOLUTION        12 // 12-bit should allow up to 10kHz
 #define PWM_MAX               0xFFF // 12-bit max
 
-//extern "C" uint8_t set_hardware_pwm(uint8_t, float, float); //this call is required for the C-based PWM block on the Editor
-
-//bool pwm_initialized[64] = {false}; // Store which PWM channels have been initialised
+extern "C" uint8_t set_hardware_pwm(uint8_t, float, float); //this call is required for the C-based PWM block on the Editor
+bool pwm_initialized[64] = {false}; // Store which PWM channels have been initialised
 
 void hardwareInit()
 {
@@ -42,33 +41,27 @@ void hardwareInit()
 
     for (int i = 0; i < NUM_ANALOG_OUTPUT; i++)
     {
+        /*  It’s assumed that cards with real DAC’s only have two channels and they are the first two assigned pins in the HAL file or 
+        the IDE config. More than two defined pins are assumed to be PWM analog channels.
+        Modified the line below so if the card has a real DAC the output gets set as an output, if not its set for PWM output
+        If the card does not have a real DAC all defined analog output pins ar set for PWM
+        */
 
-/* 	It’s assumed that cards with real DAC’s only have two channels and they are the first two assigned pins in the HAL file or 
-    the IDE config. More than two defined pins are assumed to be PWM analog channels.
-     Modified the line below so if the card has a real DAC the output gets set as an output, if not its set for PWM output
-	If the card does not have a real DAC all defined analog output pins ar set for PWM
-*/
-
-#if (SOC_DAC_SUPPORTED)
-
-    
-	if (i < 2)
-		{ 
-			 pinMode(pinMask_AOUT[i], OUTPUT);
-		}
-	else	{	
-				ledcAttach(pinMask_AOUT[i], PWM_ANALOG_FREQ, PWM_RESOLUTION);
-
-		}
-#else
-
-	ledcAttach(pinMask_AOUT[i], PWM_ANALOG_FREQ, PWM_RESOLUTION);
-#endif
-
+        #if (SOC_DAC_SUPPORTED)
+            if (i < 2)
+            { 
+                pinMode(pinMask_AOUT[i], OUTPUT);
+            }
+            else	
+            {	
+                ledcAttach(pinMask_AOUT[i], PWM_ANALOG_FREQ, PWM_RESOLUTION);
+            }
+        #else
+            ledcAttach(pinMask_AOUT[i], PWM_ANALOG_FREQ, PWM_RESOLUTION);
+        #endif
     }
 }
 
-/*
 uint8_t set_hardware_pwm(uint8_t ch, float freq, float duty)
 {
     if (!pwm_initialized[ch])
@@ -83,7 +76,6 @@ uint8_t set_hardware_pwm(uint8_t ch, float freq, float duty)
     ledcWrite(ch, (uint32_t)(duty / 100 * PWM_MAX));
     return ledcChangeFrequency(ch, (uint32_t)freq, PWM_RESOLUTION);
 }
-*/
 
 void updateInputBuffers()
 {
@@ -112,23 +104,20 @@ void updateOutputBuffers()
     {
         if (int_output[i] != NULL)
         {
-// Modified the line below so if the loop index "i" is < 2 that means the channel is a real DAC if > 2 then its a PWM analog output
-
-#if (SOC_DAC_SUPPORTED )
+            // Modified the line below so if the loop index "i" is < 2 that means the channel is a real DAC if > 2 then its a PWM analog output
             
-		if (i < 2)
-			{
-				dacWrite(pinMask_AOUT[i], (*int_output[i] / 256));
-			}
-		else	{
-						ledcWrite(pinMask_AOUT[i], (*int_output[i] / 16));
-			}
-			
-				
-#else
-            ledcWrite(pinMask_AOUT[i], (*int_output[i] / 16));
-#endif
-
+            #if (SOC_DAC_SUPPORTED )
+                if (i < 2)
+                {
+                    dacWrite(pinMask_AOUT[i], (*int_output[i] / 256));
+                }
+                else
+                {
+                    ledcWrite(pinMask_AOUT[i], (*int_output[i] / 16));
+                }
+            #else
+                ledcWrite(pinMask_AOUT[i], (*int_output[i] / 16));
+            #endif
         }
     }
 }
