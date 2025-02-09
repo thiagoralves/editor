@@ -351,6 +351,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.slaveid_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, u"0", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.slaveid_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.slaveid_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer2.Add( self.slaveid_txt, 0, wx.ALL, 5 )
 
@@ -362,6 +363,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.txpin_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, u"-1", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.txpin_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.txpin_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer2.Add( self.txpin_txt, 0, wx.ALL, 5 )
         
@@ -407,6 +409,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.mac_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, u"0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.mac_txt.SetMinSize( wx.Size( 560,-1 ) )
+        self.mac_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer3.Add( self.mac_txt, 0, wx.ALL|wx.EXPAND, 5 )
 
@@ -425,6 +428,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.ip_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.ip_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.ip_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.ip_txt, 0, wx.ALL, 5 )
 
@@ -436,6 +440,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.dns_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.dns_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.dns_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.dns_txt, 0, wx.ALL, 5 )
 
@@ -447,6 +452,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.gateway_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.gateway_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.gateway_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.gateway_txt, 0, wx.ALL, 5 )
 
@@ -458,6 +464,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.subnet_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, u"255.255.255.0", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.subnet_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.subnet_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.subnet_txt, 0, wx.ALL, 5 )
 
@@ -469,6 +476,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.wifi_ssid_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.wifi_ssid_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.wifi_ssid_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.wifi_ssid_txt, 0, wx.ALL, 5 )
 
@@ -480,6 +488,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.wifi_pwd_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_PASSWORD )
         self.wifi_pwd_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.wifi_pwd_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.wifi_pwd_txt, 0, wx.ALL, 5 )
 
@@ -699,10 +708,10 @@ class ArduinoUploadDialog(wx.Dialog):
         board_dout = self.settings.get('user_dout', self.hals[board_type]["default_dout"])
         board_aout = self.settings.get('user_aout', self.hals[board_type]["default_aout"])
 
-        self.din_txt.SetValue(str(board_din))
-        self.ain_txt.SetValue(str(board_ain))
-        self.dout_txt.SetValue(str(board_dout))
-        self.aout_txt.SetValue(str(board_aout))
+        self.din_txt.ChangeValue(str(board_din))
+        self.ain_txt.ChangeValue(str(board_ain))
+        self.dout_txt.ChangeValue(str(board_dout))
+        self.aout_txt.ChangeValue(str(board_aout))
 
     def send_output_text(self, output):
         self.text_queue.put(output) # queue the text output seperately and thread-safe, as CallAfter() does not preserve the call order
@@ -1033,7 +1042,7 @@ class ArduinoUploadDialog(wx.Dialog):
         if not all(key in self.settings for key in ['user_din', 'user_ain', 'user_dout', 'user_aout']):
             self.restoreIODefaults(None, force_overwrite=False)
         
-        # print(json.dumps(self.settings, indent=2))
+        # print("Arduino settings:", json.dumps(self.settings, indent=2))
         
     def restoreCommDefaults(self, event):
         # Copy default settings
@@ -1084,26 +1093,27 @@ class ArduinoUploadDialog(wx.Dialog):
                 break
         self.com_port_combo.SetValue(com_port_value)
         
-        # Update Modbus Serial Settings
+        # Update IO fields and handle enable/disable states
         self.check_modbus_serial.SetValue(self.settings['mb_serial'])
-        self.serial_iface_combo.SetValue(self.settings['serial_iface'])
-        self.baud_rate_combo.SetValue(self.settings['baud'])
-        self.slaveid_txt.SetValue(self.settings['slaveid'])
-        self.txpin_txt.SetValue(self.settings['txpin'])
-    
-        # Update TCP Settings
         self.check_modbus_tcp.SetValue(self.settings['mb_tcp'])
         self.tcp_iface_combo.SetValue(self.settings['tcp_iface'])
-        self.mac_txt.SetValue(self.settings['mac'])
-        self.ip_txt.SetValue(self.settings['ip'])
-        self.dns_txt.SetValue(self.settings['dns'])
-        self.gateway_txt.SetValue(self.settings['gateway'])
-        self.subnet_txt.SetValue(self.settings['subnet'])
-        self.wifi_ssid_txt.SetValue(self.settings['ssid'])
-        self.wifi_pwd_txt.SetValue(self.settings['pwd'])
-    
-        # Update IO fields and handle enable/disable states
         self.onUIChange(None)
+        
+        # Update Modbus Serial Settings
+        self.serial_iface_combo.ChangeValue(self.settings['serial_iface'])
+        self.baud_rate_combo.ChangeValue(self.settings['baud'])
+        self.slaveid_txt.ChangeValue(self.settings['slaveid'])
+        self.txpin_txt.ChangeValue(self.settings['txpin'])
+    
+        # Update TCP Settings
+        self.mac_txt.ChangeValue(self.settings['mac'])
+        self.ip_txt.ChangeValue(self.settings['ip'])
+        self.dns_txt.ChangeValue(self.settings['dns'])
+        self.gateway_txt.ChangeValue(self.settings['gateway'])
+        self.subnet_txt.ChangeValue(self.settings['subnet'])
+        self.wifi_ssid_txt.ChangeValue(self.settings['ssid'])
+        self.wifi_pwd_txt.ChangeValue(self.settings['pwd'])
+    
         self.settingsInternalUpdate = oldSettingsUpdateFlag
 
     def markSettingsForSave(self, caller: str = None):
