@@ -86,7 +86,7 @@ class ArduinoUploadDialog(wx.Dialog):
         self.m_staticText1.Wrap(-1)
         top_sizer.Add(self.m_staticText1, pos=(0,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
 
-        self.board_type_combo = wx.ComboBox(top_panel, wx.ID_ANY, "Arduino Uno", wx.DefaultPosition, wx.Size(-1,-1), self.board_type_comboChoices, wx.CB_READONLY)
+        self.board_type_combo = wx.ComboBox(top_panel, wx.ID_ANY, "Arduino Uno", wx.DefaultPosition, wx.Size(-1,-1), self.board_type_comboChoices)
         top_sizer.Add(self.board_type_combo, pos=(0,1), flag=wx.ALL | wx.EXPAND, border=0)
 
         self.loadHals()
@@ -320,7 +320,7 @@ class ArduinoUploadDialog(wx.Dialog):
         fgSizer2.Add( self.m_staticText10, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5 )
 
         serial_iface_comboChoices = [ u"Serial", u"Serial1", u"Serial2", u"Serial3" ]
-        self.serial_iface_combo = wx.ComboBox( self.m_panel7, wx.ID_ANY, u"Serial", wx.DefaultPosition, wx.DefaultSize, serial_iface_comboChoices, wx.CB_READONLY )
+        self.serial_iface_combo = wx.ComboBox( self.m_panel7, wx.ID_ANY, u"Serial", wx.DefaultPosition, wx.DefaultSize, serial_iface_comboChoices)
         self.serial_iface_combo.SetSelection( 0 )
         self.serial_iface_combo.SetMinSize( wx.Size( 180,-1 ) )
 
@@ -333,7 +333,7 @@ class ArduinoUploadDialog(wx.Dialog):
         fgSizer2.Add( self.m_staticText11, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5 )
 
         baud_rate_comboChoices = [ u"9600", u"14400", u"19200", u"38400", u"57600", u"115200" ]
-        self.baud_rate_combo = wx.ComboBox( self.m_panel7, wx.ID_ANY, u"115200", wx.DefaultPosition, wx.DefaultSize, baud_rate_comboChoices, wx.CB_READONLY )
+        self.baud_rate_combo = wx.ComboBox( self.m_panel7, wx.ID_ANY, u"115200", wx.DefaultPosition, wx.DefaultSize, baud_rate_comboChoices)
         self.baud_rate_combo.SetSelection( 5 )
         self.baud_rate_combo.SetMinSize( wx.Size( 180,-1 ) )
 
@@ -394,7 +394,7 @@ class ArduinoUploadDialog(wx.Dialog):
         fgSizer3.Add( self.m_staticText14, 0, wx.ALL, 5 )
 
         tcp_iface_comboChoices = [ u"Ethernet", u"WiFi" ]
-        self.tcp_iface_combo = wx.ComboBox( self.m_panel7, wx.ID_ANY, u"Ethernet", wx.DefaultPosition, wx.DefaultSize, tcp_iface_comboChoices, wx.CB_READONLY )
+        self.tcp_iface_combo = wx.ComboBox( self.m_panel7, wx.ID_ANY, u"Ethernet", wx.DefaultPosition, wx.DefaultSize, tcp_iface_comboChoices)
         self.tcp_iface_combo.SetSelection( 0 )
         self.tcp_iface_combo.SetMinSize( wx.Size( 560,-1 ) )
         self.tcp_iface_combo.Bind(wx.EVT_COMBOBOX, self.updateModbusSettings)
