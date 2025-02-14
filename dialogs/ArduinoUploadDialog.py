@@ -1,3 +1,4 @@
+import copy
 import re
 import datetime
 import threading
@@ -11,11 +12,10 @@ import wx
 import wx.stc as stc
 
 import time
+import zipfile
 import os
 import platform
 import json
-import time
-import glob
 
 # -------------------------------------------------------------------------------
 #                            Arduino Upload Dialog
@@ -23,16 +23,18 @@ import glob
 
 hals_file = os.path.abspath('editor/arduino/examples/Baremetal/hals.json')
 default_settings_file = os.path.abspath('editor/arduino/examples/Baremetal/settingsDefaults.json')
+build_log_archive_filename = 'arduino-saved-build-logs.zip'
 
 class ArduinoUploadDialog(wx.Dialog):
     """Dialog to configure upload parameters"""
     BUILD_OPTIONS = [
             (_("Use build cache"), builder.BuildCacheOption.USE_CACHE),
             (_("Clean build cache"), builder.BuildCacheOption.CLEAN_BUILD),
-            (_("Clean build cache, upgrade core"), builder.BuildCacheOption.UPGRADE_CORE),
-            (_("Clean build cache, upgrade libraries"), builder.BuildCacheOption.UPGRADE_LIBS),
-            (_("Clean build cache, reinstall libraries"), builder.BuildCacheOption.CLEAN_LIBS),
-            (_("Mr. Proper (Clean, reinstall core, board and libraries)"), builder.BuildCacheOption.MR_PROPER)
+            (_("Install dependencies, check upgrades (uses internet connection)"), builder.BuildCacheOption.INSTALL_DEPS),
+            (_("Upgrade core (uses internet connection)"), builder.BuildCacheOption.UPGRADE_CORE),
+            (_("Upgrade libraries (uses internet connection)"), builder.BuildCacheOption.UPGRADE_LIBS),
+            (_("Reinstall libraries (uses internet connection)"), builder.BuildCacheOption.CLEAN_LIBS),
+            (_("Mr. Proper (Clean, reinstall core, board and libraries, uses internet connection)"), builder.BuildCacheOption.MR_PROPER)
         ]
 
 
@@ -66,18 +68,7 @@ class ArduinoUploadDialog(wx.Dialog):
         wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = _('Transfer Program to PLC'), pos = wx.DefaultPosition, style = wx.DEFAULT_DIALOG_STYLE )
 
         # load Hals automatically and initialize the board_type_comboChoices
-        self.loadHals()
-        self.updateInstalledBoards()
-        board_type_comboChoices = []
-        for board in self.hals:
-            board_name = ""
-            if self.hals[board]['version'] == "0":
-                board_name = board + ' [' + _('NOT INSTALLED') + ']'
-            else:
-                board_name = board + ' [' + self.hals[board]['version'] + ']'
-
-            board_type_comboChoices.append(board_name)
-        board_type_comboChoices.sort()
+        self.board_type_comboChoices = []
 
         self.SetSizeHints(wx.Size(-1,-1), wx.DefaultSize)
 
@@ -95,8 +86,11 @@ class ArduinoUploadDialog(wx.Dialog):
         self.m_staticText1.Wrap(-1)
         top_sizer.Add(self.m_staticText1, pos=(0,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
 
-        self.board_type_combo = wx.ComboBox(top_panel, wx.ID_ANY, "Arduino Uno", wx.DefaultPosition, wx.Size(-1,-1), board_type_comboChoices, wx.CB_READONLY)
+        self.board_type_combo = wx.ComboBox(top_panel, wx.ID_ANY, "Arduino Uno", wx.DefaultPosition, wx.Size(-1,-1), self.board_type_comboChoices, wx.CB_READONLY)
         top_sizer.Add(self.board_type_combo, pos=(0,1), flag=wx.ALL | wx.EXPAND, border=0)
+
+        self.loadHals()
+        self.updateInstalledBoards()
 
         self.m_staticline1 = wx.StaticLine(top_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
         top_sizer.Add(self.m_staticline1, pos=(1,0), span=(1,3), flag=wx.EXPAND, border=5)
@@ -142,7 +136,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         # Create compile only checkbox
         self.check_compile = wx.CheckBox(self.m_panel5, wx.ID_ANY, _('Compile Only'), wx.DefaultPosition, wx.DefaultSize, 0)
-        self.check_compile.Bind(wx.EVT_CHECKBOX, self.onUIChange)
+        self.check_compile.Bind(wx.EVT_CHECKBOX, self.onCompileChange)
         # Add to horizontal sizer, aligned left
         gbs.Add(self.check_compile, pos=(1,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL, border=5)
 
@@ -205,11 +199,28 @@ class ArduinoUploadDialog(wx.Dialog):
         # define the text communication queue
         self.text_queue = queue.Queue()
 
+        # Create a GridBagSizer for the Transfer/Compile/SaveLogs buttons
+        gbs2 = wx.GridBagSizer(vgap=5, hgap=5)
+        
         self.upload_button = wx.Button(self.m_panel5, wx.ID_ANY, _('Transfer to PLC'), wx.DefaultPosition, wx.DefaultSize, 0)
         self.upload_button.SetMinSize(wx.Size(150,30))
         self.upload_button.Bind(wx.EVT_BUTTON, self.OnUpload)
 
-        bSizer21.Add(self.upload_button, 0, wx.ALIGN_CENTER|wx.ALL, 5)
+        self.buildlog_button = wx.Button(self.m_panel5, wx.ID_ANY, _('Save build log to project'), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.buildlog_button.SetToolTip(_('Save the most recent build output log to the ZIP file \'{build_log_archive_filename}\' in the current project.\nAdds the build start time stamp to the file name inside the ZIP file.\nWorks also for old builds and without build output in the window.\nDoes not check, if the saved build.log matches the current project.').format(build_log_archive_filename=build_log_archive_filename))
+        self.buildlog_button.SetMinSize(wx.Size(200,30))
+        self.buildlog_button.Bind(wx.EVT_BUTTON, self.SaveBuildLog)
+
+        gbs2.Add(self.upload_button, pos=(0,1), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
+        gbs2.Add(self.buildlog_button, pos=(0,3), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
+        # Make the left and the middle column growable
+        gbs2.AddGrowableCol(0)
+        gbs2.AddGrowableCol(2)
+        
+        if not os.path.exists(f'{builder._arduino_src_path}/build.log'):
+            self.buildlog_button.Enable(False)
+        
+        bSizer21.Add(gbs2, 0, wx.EXPAND | wx.ALL, 5)
 
         self.m_panel5.SetSizer(bSizer21)
         self.m_panel5.Layout()
@@ -340,6 +351,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.slaveid_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, u"0", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.slaveid_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.slaveid_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer2.Add( self.slaveid_txt, 0, wx.ALL, 5 )
 
@@ -351,6 +363,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.txpin_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, u"-1", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.txpin_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.txpin_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer2.Add( self.txpin_txt, 0, wx.ALL, 5 )
         
@@ -396,6 +409,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.mac_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, u"0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.mac_txt.SetMinSize( wx.Size( 560,-1 ) )
+        self.mac_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer3.Add( self.mac_txt, 0, wx.ALL|wx.EXPAND, 5 )
 
@@ -414,6 +428,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.ip_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.ip_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.ip_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.ip_txt, 0, wx.ALL, 5 )
 
@@ -425,6 +440,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.dns_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.dns_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.dns_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.dns_txt, 0, wx.ALL, 5 )
 
@@ -436,6 +452,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.gateway_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.gateway_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.gateway_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.gateway_txt, 0, wx.ALL, 5 )
 
@@ -447,6 +464,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.subnet_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, u"255.255.255.0", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.subnet_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.subnet_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.subnet_txt, 0, wx.ALL, 5 )
 
@@ -458,6 +476,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.wifi_ssid_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.wifi_ssid_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.wifi_ssid_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.wifi_ssid_txt, 0, wx.ALL, 5 )
 
@@ -469,6 +488,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.wifi_pwd_txt = wx.TextCtrl( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_PASSWORD )
         self.wifi_pwd_txt.SetMinSize( wx.Size( 180,-1 ) )
+        self.wifi_pwd_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         fgSizer4.Add( self.wifi_pwd_txt, 0, wx.ALL, 5 )
 
@@ -631,6 +651,17 @@ class ArduinoUploadDialog(wx.Dialog):
         self.markSettingsForSave("updateModbusSettings")
         self.onUIChange(None)  # Update GUI states
 
+    def onCompileChange(self, e):
+        # Update Compile controls
+        if (self.check_compile.GetValue() == False):
+            self.com_port_combo.Enable(True)
+            self.reload_button.Enable(True)
+            self.upload_button.SetLabel(_('Transfer to PLC'))
+        else:
+            self.com_port_combo.Enable(False)
+            self.reload_button.Enable(False)
+            self.upload_button.SetLabel(_('Compile'))
+
     def onUIChange(self, e):
         """Update UI states based on current settings"""
         # Update Modbus Serial controls
@@ -644,16 +675,6 @@ class ArduinoUploadDialog(wx.Dialog):
             self.baud_rate_combo.Enable(True)
             self.slaveid_txt.Enable(True)
             self.txpin_txt.Enable(True)
-
-        # Update Compile controls
-        if (self.check_compile.GetValue() == False):
-            self.com_port_combo.Enable(True)
-            self.reload_button.Enable(True)
-            self.upload_button.SetLabel(_('Transfer to PLC'))
-        else:
-            self.com_port_combo.Enable(False)
-            self.reload_button.Enable(False)
-            self.upload_button.SetLabel(_('Compile'))
 
         if (self.check_modbus_tcp.GetValue() == False):
             self.tcp_iface_combo.Enable(False)
@@ -687,10 +708,10 @@ class ArduinoUploadDialog(wx.Dialog):
         board_dout = self.settings.get('user_dout', self.hals[board_type]["default_dout"])
         board_aout = self.settings.get('user_aout', self.hals[board_type]["default_aout"])
 
-        self.din_txt.SetValue(str(board_din))
-        self.ain_txt.SetValue(str(board_ain))
-        self.dout_txt.SetValue(str(board_dout))
-        self.aout_txt.SetValue(str(board_aout))
+        self.din_txt.ChangeValue(str(board_din))
+        self.ain_txt.ChangeValue(str(board_ain))
+        self.dout_txt.ChangeValue(str(board_dout))
+        self.aout_txt.ChangeValue(str(board_aout))
 
     def send_output_text(self, output):
         self.text_queue.put(output) # queue the text output seperately and thread-safe, as CallAfter() does not preserve the call order
@@ -813,17 +834,10 @@ class ArduinoUploadDialog(wx.Dialog):
         compiler_thread.start()
         compiler_thread.join()
         
-        values_changed = (
-            old_values['last_update'] != board_hal.get('last_update', None) or 
-            old_values['version'] != board_hal.get('version', None)
-        )
-        
-        if values_changed:
-            self.saveHals()
-
-        self.saveSettings()
+        # self.saveSettings()
         self.updateInstalledBoards()
-        self.loadSettings() # Get the correct board name if an update or install occurred
+        self.loadSettings()
+        wx.CallAfter(self._applySettingsToGui)
 
         # reset the build cache option and enable the UI
         wx.CallAfter(self.set_build_option, builder.BuildCacheOption.USE_CACHE)
@@ -834,14 +848,34 @@ class ArduinoUploadDialog(wx.Dialog):
         self.check_compile.Enable(enabled)
         if (not enabled or self.check_compile.GetValue() == False):
             self.com_port_combo.Enable(enabled)
-        self.reload_button.Enable(enabled)
+            self.reload_button.Enable(enabled)
+            
         self.upload_button.Enable(enabled)
+        
+        if not os.path.exists(f'{builder._arduino_src_path}/build.log'):
+            self.buildlog_button.Enable(False)
+        else:
+            self.buildlog_button.Enable(enabled)
+        
         self.build_options.Enable(enabled)
 
     def OnUpload(self, event):
         self.setUIState(False)
         builder_thread = threading.Thread(target=self.startBuilder)
         builder_thread.start()
+
+    def SaveBuildLog(self, event):
+        self.setUIState(False)
+        log_file = os.path.join(builder._arduino_src_path, 'build.log')
+        if os.path.exists(log_file):
+            zip_filename = os.path.join(self.project_controller.ProjectPath, build_log_archive_filename)
+            stamped_log_filename = get_timestamped_logfilename(log_file)
+            if stamped_log_filename:
+                with zipfile.ZipFile(zip_filename, 'a', zipfile.ZIP_DEFLATED) as zipf:
+                    if stamped_log_filename not in zipf.namelist():
+                        zipf.write(log_file, stamped_log_filename)
+            cleanup_zip_file(zip_filename)
+        self.setUIState(True)
 
     def generateDefinitions(self):
         """Generate definitions and store them in the object"""
@@ -917,6 +951,39 @@ class ArduinoUploadDialog(wx.Dialog):
         if any(stm_func in self.plc_program for stm_func in ['STM32CAN_CONF;', 'STM32CAN_WRITE;', 'STM32CAN_READ;']):
             self.definitions.append('#define USE_STM32CAN_BLOCK')
 
+    def resolveBoardTypeAlias(self, alias_name):
+        """
+        Resolve a board type alias to its actual name.
+        
+        Args:
+            alias_name (str): The alias name to resolve
+            
+        Returns:
+            str: The actual board type name if found, otherwise None
+        """
+        # First check if the alias is a direct board type
+        if alias_name in self.hals:
+            return alias_name
+            
+        # Search through all board types and their aliases
+        for board_type, board_info in self.hals.items():
+            # Check if board has aliases entry
+            if 'aliases' not in board_info:
+                continue
+                
+            # Handle the case where aliases is a string
+            if isinstance(board_info['aliases'], str):
+                if board_info['aliases'] == alias_name:
+                    return board_type
+                continue
+                
+            # Handle the case where aliases is a list
+            if isinstance(board_info['aliases'], list):
+                if alias_name in board_info['aliases']:
+                    return board_type
+                    
+        # No match found
+        return None
 
     def saveSettings(self, event=None):
         self.settings['board_type'] = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
@@ -948,24 +1015,34 @@ class ArduinoUploadDialog(wx.Dialog):
         self.settings.pop('last_update', None)
 
         self.markSettingsForSave("saveSettings")
-
+    
     def loadSettings(self):
         """Load settings and update GUI"""
-        self.settings = self.project_controller.GetArduinoSettings() or self.default_settings.copy()
-        
+        self.settings = self.project_controller.GetArduinoSettings()
         # Fill missing values from defaults
-        for key in self.default_settings:
-            if key not in self.settings:
-                self.settings[key] = self.default_settings[key]
+        self.settings.update({k:copy.deepcopy(v) for k,v in self.default_settings.items() if k not in self.settings})
         
         # normalize the board type entry from earlier editor versions
-        self.settings['board_type'] = self.settings.get('board_type').split(" [")[0]
+        normalized_board_type = self.settings.get('board_type').split(" [")[0]
+        
+        # Try to resolve the board type if it's not directly in self.hals
+        if normalized_board_type not in self.hals:
+            resolved_board_type = self.resolveBoardTypeAlias(normalized_board_type)
+            if resolved_board_type is not None:
+                normalized_board_type = resolved_board_type
+                oldUpdateFlag = self.settingsInternalUpdate
+                self.settingsInternalUpdate = False
+                self.markSettingsForSave("loadSettings")    # we had to translate a renamed board type, mark the project data for save
+                self.settingsInternalUpdate = oldUpdateFlag
+                wx.MessageDialog(self, _('Board type "{oldType}"\nwas updated to "{newType}",\ne.g. due to renaming of the old type.').format(oldType=self.settings.get('board_type'), newType=normalized_board_type), _('Board Type Update'), wx.OK | wx.ICON_INFORMATION).ShowModal()
+        
+        self.settings['board_type'] = normalized_board_type
         
         # Check if any IO setting is missing and restore defaults if needed
         if not all(key in self.settings for key in ['user_din', 'user_ain', 'user_dout', 'user_aout']):
             self.restoreIODefaults(None, force_overwrite=False)
         
-        # print(json.dumps(self.settings, indent=2))
+        # print("Arduino settings:", json.dumps(self.settings, indent=2))
         
     def restoreCommDefaults(self, event):
         # Copy default settings
@@ -992,6 +1069,8 @@ class ArduinoUploadDialog(wx.Dialog):
 
     def _applySettingsToGui(self):
         """Update all GUI elements from self.settings"""
+        oldSettingsUpdateFlag = self.settingsInternalUpdate
+        self.settingsInternalUpdate = True
         # Get the correct name for the board_type
         board = self.settings['board_type'].split(' [')[0]
         board_name = ""
@@ -1001,7 +1080,9 @@ class ArduinoUploadDialog(wx.Dialog):
             else:
                 board_name = board + ' [' + self.hals[board]['version'] + ']'
     
-        # Set board and COM port
+        # Set board
+        self.board_type_combo.Clear()
+        self.board_type_combo.Set(self.board_type_comboChoices)
         self.board_type_combo.SetValue(board_name)
         
         # Update COM port display
@@ -1012,29 +1093,32 @@ class ArduinoUploadDialog(wx.Dialog):
                 break
         self.com_port_combo.SetValue(com_port_value)
         
-        # Update Modbus Serial Settings
+        # Update IO fields and handle enable/disable states
         self.check_modbus_serial.SetValue(self.settings['mb_serial'])
-        self.serial_iface_combo.SetValue(self.settings['serial_iface'])
-        self.baud_rate_combo.SetValue(self.settings['baud'])
-        self.slaveid_txt.SetValue(self.settings['slaveid'])
-        self.txpin_txt.SetValue(self.settings['txpin'])
-    
-        # Update TCP Settings
         self.check_modbus_tcp.SetValue(self.settings['mb_tcp'])
         self.tcp_iface_combo.SetValue(self.settings['tcp_iface'])
-        self.mac_txt.SetValue(self.settings['mac'])
-        self.ip_txt.SetValue(self.settings['ip'])
-        self.dns_txt.SetValue(self.settings['dns'])
-        self.gateway_txt.SetValue(self.settings['gateway'])
-        self.subnet_txt.SetValue(self.settings['subnet'])
-        self.wifi_ssid_txt.SetValue(self.settings['ssid'])
-        self.wifi_pwd_txt.SetValue(self.settings['pwd'])
-    
-        # Update IO fields and handle enable/disable states
         self.onUIChange(None)
+        
+        # Update Modbus Serial Settings
+        self.serial_iface_combo.ChangeValue(self.settings['serial_iface'])
+        self.baud_rate_combo.ChangeValue(self.settings['baud'])
+        self.slaveid_txt.ChangeValue(self.settings['slaveid'])
+        self.txpin_txt.ChangeValue(self.settings['txpin'])
+    
+        # Update TCP Settings
+        self.mac_txt.ChangeValue(self.settings['mac'])
+        self.ip_txt.ChangeValue(self.settings['ip'])
+        self.dns_txt.ChangeValue(self.settings['dns'])
+        self.gateway_txt.ChangeValue(self.settings['gateway'])
+        self.subnet_txt.ChangeValue(self.settings['subnet'])
+        self.wifi_ssid_txt.ChangeValue(self.settings['ssid'])
+        self.wifi_pwd_txt.ChangeValue(self.settings['pwd'])
+    
+        self.settingsInternalUpdate = oldSettingsUpdateFlag
 
     def markSettingsForSave(self, caller: str = None):
         if self.settingsInternalUpdate:
+            # print("'markSettingsForSave()' ignored, caller:", caller)
             return
         
         if caller:
@@ -1082,3 +1166,97 @@ class ArduinoUploadDialog(wx.Dialog):
             self.hals[board]['version'] = version
 
         self.saveHals()
+        
+        self.board_type_comboChoices.clear()
+        for board in self.hals:
+            board_name = ""
+            if self.hals[board]['version'] == "0":
+                board_name = board + ' [' + _('NOT INSTALLED') + ']'
+            else:
+                board_name = board + ' [' + self.hals[board]['version'] + ']'
+
+            self.board_type_comboChoices.append(board_name)
+        self.board_type_comboChoices.sort()
+
+def get_timestamped_logfilename(input_filename: str) -> str:
+    """
+    Process the build log file and create a new filename with embedded timestamp.
+    Handles full paths while returning only the filename for the new name.
+    
+    Args:
+        input_filename: Name of the input file (default: "build.log")
+        
+    Returns:
+        str: new filename without path, containing the extracted timestamp
+        None: if any error occurs during processing
+    """
+    try:
+        with open(input_filename, 'r', encoding='utf-8') as file:
+            first_line = file.readline().strip()
+            
+        if not first_line:
+            return None
+            
+        # Extract timestamp using regex
+        timestamp_pattern = r'\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d{3}\]'
+        match = re.search(timestamp_pattern, first_line)
+        
+        if not match:
+            return None
+            
+        # Replace colons with hyphens in timestamp
+        safe_timestamp = match.group(1).replace(':', '-')
+            
+        # Get just the filename without path, then split into base name and extension
+        base_filename = os.path.basename(input_filename)
+        base_name = os.path.splitext(base_filename)[0]  # "build"
+        extension = os.path.splitext(base_filename)[1]   # ".log"
+        
+        return f"{base_name}-{safe_timestamp}{extension}"
+        
+    except:  # Catch all possible errors
+        return None
+
+def cleanup_zip_file(zip_filename, max_files=50, max_age_days=60):
+    # Open the original ZIP
+    with zipfile.ZipFile(zip_filename, 'r') as zip_in:
+        # Get all files with their info
+        files = []
+        for info in zip_in.infolist():
+            # Convert DOS time to datetime
+            date = datetime.datetime(*info.date_time)
+            files.append((info, date))
+        
+        # Sort by date (oldest first)
+        files.sort(key=lambda x: x[1])
+        
+        # Determine cutoff date for max_age_days
+        cutoff_date = datetime.datetime.now() - datetime.timedelta(days=max_age_days)
+        
+        # Keep only files that:
+        # 1. Are not older than max_age_days AND
+        # 2. Are among the max_files newest files
+        files_to_keep = []
+        for file_info, date in files:
+            if date >= cutoff_date:
+                files_to_keep.append(file_info)
+        
+        # Keep only the newest max_files files
+        if len(files_to_keep) > max_files:
+            files_to_keep = files_to_keep[-max_files:]
+
+        # Check if changes are needed
+        if len(files_to_keep) == len(files):
+            # No files to delete
+            return
+            
+        # Create temporary ZIP file only if changes are needed
+        temp_zip = zip_filename + '.temp'
+        with zipfile.ZipFile(temp_zip, 'w', zipfile.ZIP_DEFLATED) as zip_out:
+            for info in files_to_keep:
+                # Copy file and its data
+                zip_out.writestr(info, zip_in.read(info.filename))
+
+    # Replace old ZIP file with the new one
+    os.replace(temp_zip, zip_filename)
+

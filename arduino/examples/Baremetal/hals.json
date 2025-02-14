@@ -88,8 +88,12 @@
     "source": "uno_leonardo_nano_micro_zero.cpp",
     "version": "0"
   },
-  "Arduino Nano ESP32": {
-    "core": "arduino:esp32",
+  "Arduino Nano ESP32 (Espressif-Core)": {
+    "aliases": [
+      "Arduino Nano ESP32"
+    ],
+    "board_manager_url": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
+    "core": "esp32:esp32",
     "default_ain": "A0, A1, A2, A3, A4, A5",
     "default_aout": "9, 10, 11",
     "default_din": "2, 3, 4, 5, 6",
