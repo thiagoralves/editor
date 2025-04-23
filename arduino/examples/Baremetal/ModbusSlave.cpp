@@ -393,7 +393,7 @@ void handle_serial()
             int offset = 0; // Initialize offset for buffer
             for (int i = 0; i < mb_frame_len; i++)
             {
-            offset += sprintf(buffer + offset, "%02X ", mb_frame[i]);
+                offset += sprintf(buffer + offset, "%02X ", mb_frame[i]);
             }
             (*mb_serialport).println(buffer);
             (*mb_serialport).print("Packet_crc: ");
