@@ -2254,6 +2254,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
 
     def _generateOpenPLC(self):
         self._Clean()
+        self._buildType = "remote"
         if (self._Build() is True):
             # Generate debug info from arduino debugger
             self.generate_embed_plc_debugger()
