@@ -125,6 +125,13 @@ void mbconfig_serial_iface(Stream* port, long baud, int txPin)
     #if defined(CONTROLLINO_MAXI) || defined(CONTROLLINO_MEGA)
         if (mb_serialport == &Serial3) 
             Controllino_RS485Init();
+    #elif defined(CONTROLLINO_MICRO)
+    if (mb_serialport == &Serial2) {
+        pinMode(CUSTOM_RS485_DEFAULT_DE_PIN, OUTPUT);
+        pinMode(CUSTOM_RS485_DEFAULT_RE_PIN, OUTPUT);
+        digitalWrite(CUSTOM_RS485_DEFAULT_DE_PIN, LOW);
+        digitalWrite(CUSTOM_RS485_DEFAULT_RE_PIN, HIGH);
+    }
     #endif
 
     // Modbus states that a baud rate higher than 19200 must use a fixed 750 us
@@ -401,8 +408,8 @@ void handle_serial()
     //Check if packet is too big or too small
     if ((*mb_serialport).available() > MAX_MB_FRAME || (*mb_serialport).available() < 6)
     {
-        // (*mb_serialport).println("Packet too big");
-        //( *mb_serialport).flush();
+        //(*mb_serialport).println("Packet too big");
+        //(*mb_serialport).flush();
         return;
     }
 
@@ -420,7 +427,8 @@ void handle_serial()
         packet_crc = ((mb_frame[mb_frame_len - 2] << 8) | mb_frame[mb_frame_len - 1]);
         if (packet_crc != calcCrc()) 
         {
-            char buffer[100];
+        /* DEBUG
+	    char buffer[100];
             (*mb_serialport).println("Invalid CRC for packet: ");
             int offset = 0; // Initialize offset for buffer
             for (int i = 0; i < mb_frame_len; i++)
@@ -433,7 +441,8 @@ void handle_serial()
             (*mb_serialport).print("Calc CRC: ");
             (*mb_serialport).println(calcCrc());
             (*mb_serialport).flush();
-            return;
+        */
+	    return;
         }
     }
 
@@ -467,6 +476,11 @@ void handle_serial()
     #if defined(CONTROLLINO_MAXI) || defined(CONTROLLINO_MEGA)
         if (mb_serialport == &Serial3) // RS485 serial port
             Controllino_RS485TxEnable(); // Enable RS485 chip to transmit 
+    #elif defined(CONTROLLINO_MICRO)
+        if (mb_serialport == &Serial2) {
+            digitalWrite(CUSTOM_RS485_DEFAULT_DE_PIN, HIGH);
+            digitalWrite(CUSTOM_RS485_DEFAULT_RE_PIN, HIGH);
+        }
     #endif
 
     (*mb_serialport).write(mb_frame, mb_frame_len);
@@ -479,6 +493,11 @@ void handle_serial()
     #if defined(CONTROLLINO_MAXI) || defined(CONTROLLINO_MEGA)
         if (mb_serialport == &Serial3) // RS485 serial port
             Controllino_RS485RxEnable(); // Go back to receive mode after transmitted data
+    #elif defined(CONTROLLINO_MICRO)
+        if (mb_serialport == &Serial2) {
+            digitalWrite(CUSTOM_RS485_DEFAULT_DE_PIN, LOW);
+            digitalWrite(CUSTOM_RS485_DEFAULT_RE_PIN, LOW);
+        }    
     #endif
 }
 #endif
@@ -1315,3 +1334,4 @@ uint16_t calcCrc()
 
     return ((uint16_t)CRCHi << 8) | (uint16_t)CRCLo;
 }
+
