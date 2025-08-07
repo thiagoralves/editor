@@ -17,13 +17,12 @@ uint16_t mb_t35; // frame delay
 #ifdef MBTCP_ETHERNET
 #ifdef BOARD_ESP32
     WiFiServer mb_server(502);
+	WiFiClient mb_serverClients[MAX_SRV_CLIENTS];
 #else
     EthernetServer mb_server(502);
 #endif
     uint8_t mb_mbap[MBAP_SIZE];
-#if defined(BOARD_PORTENTA) || defined(BOARD_ESP32)
-    WiFiClient mb_serverClients[MAX_SRV_CLIENTS];
-#else
+#ifdef BOARD_PORTENTA
     EthernetClient mb_serverClients[MAX_SRV_CLIENTS];
 #endif
 #endif
@@ -1334,4 +1333,5 @@ uint16_t calcCrc()
 
     return ((uint16_t)CRCHi << 8) | (uint16_t)CRCLo;
 }
+
 
