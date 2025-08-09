@@ -378,6 +378,17 @@
     "source": "controllino_mini.cpp",
     "version": "0"
   },
+  "Canaduino Mega328 PLC-100": {
+    "core": "arduino:avr",
+    "default_ain": "A0, A1, A6, A7",
+    "default_aout": "6, 9, 10, 11",
+    "default_din": "7, 8, 12, 13",
+    "default_dout": "2, 3, 4, 5, A2, A3",
+    "last_update": 0,
+    "platform": "arduino:avr:nano",
+    "source": "uno_leonardo_nano_micro_zero.cpp",
+    "version": "0"
+  },
   "ESP32 Generic": {
     "board_manager_url": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
     "c_flags": [
@@ -395,7 +406,7 @@
     "default_din": "17, 18, 19, 21, 22, 23, 27, 32, 33",
     "default_dout": "02, 04, 05, 12, 13, 14, 15, 16",
     "define": "BOARD_ESP32",
-    "last_update": 1747401978.735272,
+    "last_update": 0,
     "platform": "esp32:esp32:esp32:UploadSpeed=230400",
     "source": "esp32.cpp",
     "version": "0"
@@ -733,7 +744,7 @@
     "default_aout": "A0",
     "default_din": "31, 0, 1, 2, 3, 4",
     "default_dout": "32, 6, 7, 11, 12, 13, 14",
-    "last_update": 1747412358.5227,
+    "last_update": 0,
     "platform": "arduino:samd:mkrzero",
     "source": "p1am.cpp",
     "version": "0"
