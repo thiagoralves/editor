@@ -13,8 +13,14 @@ Stream* mb_serialport;
 int8_t mb_txpin;
 uint16_t mb_t15; // inter character time out
 uint16_t mb_t35; // frame delay
+
 #ifdef MBTCP_ETHERNET
+#ifdef BOARD_ESP32
+    WiFiServer mb_server(502);
+	WiFiClient mb_serverClients[MAX_SRV_CLIENTS];
+#else
     EthernetServer mb_server(502);
+#endif
     uint8_t mb_mbap[MBAP_SIZE];
 #ifdef BOARD_PORTENTA
     EthernetClient mb_serverClients[MAX_SRV_CLIENTS];
@@ -149,20 +155,39 @@ void mbconfig_serial_iface(Stream* port, long baud, int txPin)
     mb_t35 = mb_t15 * 3.5;
 }
 
+
 #ifdef MBTCP
 void mbconfig_ethernet_iface(uint8_t *mac, uint8_t *ip, uint8_t *dns, uint8_t *gateway, uint8_t *subnet)
 {
     #ifdef MBTCP_ETHERNET
-        if (ip == NULL)
-            Ethernet.begin(mac);
-        else if (dns == NULL)
-            Ethernet.begin(mac, IPAddress(ip));
-        else if (gateway == NULL)
-            Ethernet.begin(mac, IPAddress(ip), IPAddress(dns));
-        else if (subnet == NULL)
-            Ethernet.begin(mac, IPAddress(ip), IPAddress(dns), IPAddress(gateway));
-        else
-            Ethernet.begin(mac, IPAddress(ip), IPAddress(dns), IPAddress(gateway), IPAddress(subnet));
+        #ifdef BOARD_ESP32
+            
+            ETH.begin();
+
+            if (ip != NULL && subnet != NULL && gateway != NULL)
+                (ETH.config(ip, gateway, subnet, dns));
+            
+        #else
+            if (ip == NULL)
+                Ethernet.begin(mac);
+            else if (dns == NULL)
+                Ethernet.begin(mac, IPAddress(ip));
+            else if (gateway == NULL)
+                Ethernet.begin(mac, IPAddress(ip), IPAddress(dns));
+            else if (subnet == NULL)
+                Ethernet.begin(mac, IPAddress(ip), IPAddress(dns), IPAddress(gateway));
+            else
+                Ethernet.begin(mac, IPAddress(ip), IPAddress(dns), IPAddress(gateway), IPAddress(subnet));
+        #endif
+
+//        int num_tries = 0;
+//        while (!ETH.linkUp()) 
+//        {
+//            delay(500);
+//            num_tries++;
+//            if (num_tries == 20) break;
+//        }
+
     #endif
     #ifdef MBTCP_WIFI
         #if defined(BOARD_ESP8266) || defined(BOARD_ESP32)
@@ -199,7 +224,9 @@ void mbconfig_ethernet_iface(uint8_t *mac, uint8_t *ip, uint8_t *dns, uint8_t *g
             if (num_tries == 10) break;
         }
     #endif
+    
     mb_server.begin();
+
 }
 #endif
 
@@ -217,8 +244,13 @@ void mbtask()
 void handle_tcp()
 {
     #ifdef MBTCP_ETHERNET
-        EthernetClient client = mb_server.available();
+        #ifdef BOARD_ESP32
+            WiFiClient client = mb_server.available();
+        #else
+            EthernetClient client = mb_server.available();
+        #endif
     #endif
+
     #if defined(MBTCP_WIFI) && !defined(BOARD_ESP8266) && !defined(BOARD_ESP32)
         WiFiClient client = mb_server.available();
     #endif
@@ -226,8 +258,10 @@ void handle_tcp()
     //ESP and Portenta boards have a slightly different implementation of the WiFi/Ethernet API - therefore their specific
     //code lies below
     #if (defined(BOARD_ESP8266) || defined(BOARD_ESP32) || defined(BOARD_PORTENTA)) || defined(BOARD_PICOW) && (defined(MBTCP_WIFI) || defined(MBTCP_ETHERNET))
-        #if defined(BOARD_PORTENTA) || defined(BOARD_PICOW)
-        if (client)
+
+
+        #if defined(BOARD_PORTENTA) || defined(BOARD_PICOW) || (defined(BOARD_ESP32) && defined(MBTCP_ETHERNET))
+        if (client) 
         #else
         if (mb_server.hasClient())
         #endif
@@ -236,7 +270,7 @@ void handle_tcp()
             {
                 if (!mb_serverClients[i]) //equivalent to !serverClients[i].connected()
                 {
-                    #if defined(BOARD_PORTENTA) || defined(BOARD_PICOW)
+                    #if defined(BOARD_PORTENTA) || defined(BOARD_PICOW) || defined(BOARD_ESP32) && defined(MBTCP_ETHERNET)
                     mb_serverClients[i] = client;
                     #else
                     mb_serverClients[i] = mb_server.available();
@@ -250,9 +284,14 @@ void handle_tcp()
         for (int i = 0; i < MAX_SRV_CLIENTS; i++) 
         {
             int j = 0;
+
+
             if (mb_serverClients[i].connected() && mb_serverClients[i].available())
+
             {
                 //Read packet
+
+
                 while (mb_serverClients[i].available())
                 {
                     mb_mbap[j] = mb_serverClients[i].read();
@@ -368,8 +407,8 @@ void handle_serial()
     //Check if packet is too big or too small
     if ((*mb_serialport).available() > MAX_MB_FRAME || (*mb_serialport).available() < 6)
     {
-        (*mb_serialport).println("Packet too big");
-        (*mb_serialport).flush();
+        //(*mb_serialport).println("Packet too big");
+        //(*mb_serialport).flush();
         return;
     }
 
@@ -387,7 +426,8 @@ void handle_serial()
         packet_crc = ((mb_frame[mb_frame_len - 2] << 8) | mb_frame[mb_frame_len - 1]);
         if (packet_crc != calcCrc()) 
         {
-            char buffer[100];
+        /* DEBUG
+	    char buffer[100];
             (*mb_serialport).println("Invalid CRC for packet: ");
             int offset = 0; // Initialize offset for buffer
             for (int i = 0; i < mb_frame_len; i++)
@@ -400,7 +440,8 @@ void handle_serial()
             (*mb_serialport).print("Calc CRC: ");
             (*mb_serialport).println(calcCrc());
             (*mb_serialport).flush();
-            return;
+        */
+	    return;
         }
     }
 
@@ -455,7 +496,7 @@ void handle_serial()
         if (mb_serialport == &Serial2) {
             digitalWrite(CUSTOM_RS485_DEFAULT_DE_PIN, LOW);
             digitalWrite(CUSTOM_RS485_DEFAULT_RE_PIN, LOW);
-        }
+        }    
     #endif
 }
 #endif
@@ -1292,3 +1333,5 @@ uint16_t calcCrc()
 
     return ((uint16_t)CRCHi << 8) | (uint16_t)CRCLo;
 }
+
+

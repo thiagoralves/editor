@@ -950,6 +950,8 @@ class ArduinoUploadDialog(wx.Dialog):
             self.definitions.append('#define USE_ARDUINOCAN_BLOCK')
         if any(stm_func in self.plc_program for stm_func in ['STM32CAN_CONF;', 'STM32CAN_WRITE;', 'STM32CAN_READ;']):
             self.definitions.append('#define USE_STM32CAN_BLOCK')
+        if any(lib in self.plc_program for lib in ['SM_8RELAY;', 'SM_16RELAY;', 'SM_8DIN;', 'SM_16DIN;', 'SM_4REL4IN;', 'SM_INDUSTRIAL', 'SM_RTD', 'SM_BAS', 'SM_HOME', 'SM_8MOSFET']):
+            self.definitions.append('#define USE_SM_BLOCKS')
 
     def resolveBoardTypeAlias(self, alias_name):
         """

@@ -2254,6 +2254,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
 
     def _generateOpenPLC(self):
         self._Clean()
+        self._buildType = "remote"
         if (self._Build() is True):
             # Generate debug info from arduino debugger
             self.generate_embed_plc_debugger()
@@ -2434,7 +2435,10 @@ class ProjectController(ConfigTreeNode, PLCControler):
             if MD5 is None:
                 self.logger.write_error("Error building project: md5 object is null\n")
                 return
-
+            
+            # Insert a little break to give time to the target to start before reading MD5
+            # (this is particularly important for slow Arduino 8-bit boards)
+            time.sleep(2)
             if self._connector.MatchMD5(MD5, request_type='remote') == True:
                 self.logger.write("Program matches PLC MD5\n")
                 #Transfer PLC program
