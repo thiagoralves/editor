@@ -36,6 +36,30 @@
         </documentation>
       </pou>
 
+      <pou name="SLM_04THM_CONFIG" pouType="functionBlock">
+        <interface>
+          <inputVars>
+            <variable name="SLOT"><type><SINT/></type></variable>
+            <variable name="UNITS"><type><SINT/></type></variable>
+            <variable name="CH1_RANGE"><type><SINT/></type></variable>
+            <variable name="CH2_RANGE"><type><SINT/></type></variable>
+            <variable name="CH3_RANGE"><type><SINT/></type></variable>
+            <variable name="CH4_RANGE"><type><SINT/></type></variable>
+          </inputVars>
+          <outputVars>
+            <variable name="SUCCESS"><type><BOOL/></type></variable>
+          </outputVars>
+        </interface>
+        <body>
+          <ST>
+            <xhtml:p><![CDATA[SUCCESS := 0;]]></xhtml:p>
+          </ST>
+        </body>
+        <documentation>
+          <xhtml:p><![CDATA[UNITS: 1 = C/Low Burnout, 2 = C/High Burnout, 3 = F/Low Burnout, 3 = F/High Burnout        CHANNELS: 0 = J, 1 = K, 2 = E, 3 = R, 4 = T, 5 = B, 6 = N, 7 = C]]></xhtml:p>
+        </documentation>
+      </pou>
+
       <pou name="SLM_DISCRETE_OUT_8" pouType="functionBlock">
         <interface>
           <inputVars>
