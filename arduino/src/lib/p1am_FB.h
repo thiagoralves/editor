@@ -175,6 +175,26 @@ typedef struct {
   // FB private variables - TEMP, private and located variables
 
 } P1_08AD;
+
+// P1_08DA
+// Data part
+typedef struct {
+  // FB Interface - IN, OUT, IN_OUT variables
+  __DECLARE_VAR(BOOL,EN)
+  __DECLARE_VAR(BOOL,ENO)
+  __DECLARE_VAR(SINT,SLOT)
+  __DECLARE_VAR(UINT,O1)
+  __DECLARE_VAR(UINT,O2)
+  __DECLARE_VAR(UINT,O3)
+  __DECLARE_VAR(UINT,O4)
+  __DECLARE_VAR(UINT,O5)
+  __DECLARE_VAR(UINT,O6)
+  __DECLARE_VAR(UINT,O7)
+  __DECLARE_VAR(UINT,O8)
+
+  // FB private variables - TEMP, private and located variables
+
+} P1_08DA;
 /************************************************************************
  *                      END OF P1AM LIB BLOCKS                          *
 ************************************************************************/
@@ -187,6 +207,7 @@ uint8_t p1am_init();
 void p1am_writeDiscrete(uint32_t, uint8_t, uint8_t);
 uint32_t p1am_readDiscrete(uint8_t, uint8_t);
 uint16_t p1am_readAnalog(uint8_t, uint8_t);
+void p1am_writeAnalog(uint16_t, uint8_t, uint8_t);
 void print_msg(char *);
 
 static void P1AM_INIT_init__(P1AM_INIT *data__, BOOL retain) {
@@ -557,6 +578,47 @@ static void P1_08AD_body__(P1_08AD *data__) {
 __end:
   return;
 } // P1_08AD_body__()
+
+static void P1_08DA_init__(P1_08DA *data__, BOOL retain) {
+  __INIT_VAR(data__->EN,__BOOL_LITERAL(TRUE),retain)
+  __INIT_VAR(data__->ENO,__BOOL_LITERAL(TRUE),retain)
+  __INIT_VAR(data__->SLOT,0,retain)
+  __INIT_VAR(data__->O1,0,retain)
+  __INIT_VAR(data__->O2,0,retain)
+  __INIT_VAR(data__->O3,0,retain)
+  __INIT_VAR(data__->O4,0,retain)
+  __INIT_VAR(data__->O5,0,retain)
+  __INIT_VAR(data__->O6,0,retain)
+  __INIT_VAR(data__->O7,0,retain)
+  __INIT_VAR(data__->O8,0,retain)
+}
+
+// Code part
+static void P1_08DA_body__(P1_08DA *data__) {
+  // Control execution
+  if (!__GET_VAR(data__->EN)) {
+    __SET_VAR(data__->,ENO,,__BOOL_LITERAL(FALSE));
+    return;
+  }
+  else {
+    __SET_VAR(data__->,ENO,,__BOOL_LITERAL(TRUE));
+  }
+  // Real code -  inside p1am_FB.h file on arduino folder
+  p1am_writeAnalog(__GET_VAR(data__->O1), __GET_VAR(data__->SLOT), 1);
+  p1am_writeAnalog(__GET_VAR(data__->O2), __GET_VAR(data__->SLOT), 2);
+  p1am_writeAnalog(__GET_VAR(data__->O3), __GET_VAR(data__->SLOT), 3);
+  p1am_writeAnalog(__GET_VAR(data__->O4), __GET_VAR(data__->SLOT), 4);
+  p1am_writeAnalog(__GET_VAR(data__->O5), __GET_VAR(data__->SLOT), 5);
+  p1am_writeAnalog(__GET_VAR(data__->O6), __GET_VAR(data__->SLOT), 6);
+  p1am_writeAnalog(__GET_VAR(data__->O7), __GET_VAR(data__->SLOT), 7);
+  p1am_writeAnalog(__GET_VAR(data__->O8), __GET_VAR(data__->SLOT), 8);
+
+
+  goto __end;
+
+__end:
+  return;
+} // P1_08DA_body__()
 /************************************************************************
  *                      END OF P1AM LIB BLOCKS                          *
 ************************************************************************/

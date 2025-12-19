@@ -245,6 +245,33 @@
           <xhtml:p><![CDATA[Get all analog inputs from P1-08ADxx modules. Compatible with P1-08ADL]]></xhtml:p>
         </documentation>
       </pou>
+
+      <pou name="P1_08DA" pouType="functionBlock">
+        <interface>
+          <inputVars>
+            <variable name="SLOT"><type><SINT/></type></variable>
+            <variable name="O1"><type><UINT/></type></variable>
+            <variable name="O2"><type><UINT/></type></variable>
+            <variable name="O3"><type><UINT/></type></variable>
+            <variable name="O4"><type><UINT/></type></variable>
+            <variable name="O5"><type><UINT/></type></variable>
+            <variable name="O6"><type><UINT/></type></variable>
+            <variable name="O7"><type><UINT/></type></variable>
+            <variable name="O8"><type><UINT/></type></variable>
+          </inputVars>
+          <localVars>
+            <variable name="DUMMY"><type><SINT/></type></variable>
+          </localVars>
+        </interface>
+        <body>
+          <ST>
+            <xhtml:p><![CDATA[DUMMY := SLOT;]]></xhtml:p>
+          </ST>
+        </body>
+        <documentation>
+          <xhtml:p><![CDATA[Set all outputs on P1-08DAxx modules. Likley Also compatible with P1-04DAxx too]]></xhtml:p>
+        </documentation>
+      </pou>
       
     </pous>
   </types>
