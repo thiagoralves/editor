@@ -224,3 +224,22 @@ FUNCTION_BLOCK P1_08AD
   END_VAR
   I1 := 0;
 END_FUNCTION_BLOCK
+
+(*
+ * P1_08DA
+ * -------------
+ *)
+FUNCTION_BLOCK P1_08DA
+  VAR_INPUT
+    SLOT : SINT;
+    O1 : UINT;
+    O2 : UINT;
+    O3 : UINT;
+    O4 : UINT;
+	  O5 : UINT;
+    O6 : UINT;
+    O7 : UINT;
+    O8 : UINT;
+  END_VAR
+  O1 := 0;
+END_FUNCTION_BLOCK

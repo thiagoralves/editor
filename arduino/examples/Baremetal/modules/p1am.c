@@ -3,6 +3,7 @@ extern "C" uint8_t p1am_init();
 extern "C" void p1am_writeDiscrete(uint32_t, uint8_t, uint8_t);
 extern "C" uint32_t p1am_readDiscrete(uint8_t, uint8_t);
 extern "C" uint16_t p1am_readAnalog(uint8_t, uint8_t);
+extern "C" void p1am_writeAnalog(uint16_t, uint8_t, uint8_t);
 
 uint8_t modules_initialized = 0;
 
@@ -31,4 +32,9 @@ uint32_t p1am_readDiscrete(uint8_t slot, uint8_t channel)
 uint16_t p1am_readAnalog(uint8_t slot, uint8_t channel)
 {
     return (uint16_t)P1.readAnalog(slot, channel);
+}
+
+void p1am_writeAnalog(uint16_t data, uint8_t slot, uint8_t channel)
+{
+    P1.writeAnalog(data, slot, channel);
 }
